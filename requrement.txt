@@ -1,0 +1,24 @@
+# ========== 核心HTTP请求 ==========
+requests>=2.31.0
+rich>=14.2.0
+
+# ========== 语音识别相关 ==========
+SpeechRecognition>=3.10.0
+vosk>=0.3.45
+# vosk需要下载模型，见下面的说明
+# 模型下载地址：https://alphacephei.com/vosk/models
+# 下载后解压到~【下载的python文件目录下/lib/site-packages/speech_recognition/models/vosk】文件夹下
+# PyAudio在Windows需要特殊安装，见下面的说明
+# pocketsphinx>=0.1.15  # 可选，离线语音识别
+
+# ========== 语音合成相关 ==========
+pyttsx3>=2.90
+
+# ========== 音频处理 ==========
+pyaudio>=0.2.11
+wave>=0.0.2
+sounddevice>=0.4.6
+soundfile>=0.12.1
+
+# ========== 数据处理 ==========
+numpy>=1.24.0

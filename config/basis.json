@@ -1,0 +1,17 @@
+{
+  "__version__": "0.0.0：demo version",
+  "__author__": "@bilibili_秋天会有下雪天",
+  "OLLAMA_HOST": "http://localhost:11434",
+  "DEFAULT_MODEL": "gemma3:1b",
+  "AI_NAME": "小黄同学",
+  "LOOP_INTERVAL": 0.3,
+  "SPEECH_LANGUAGE": "zh-CN",
+  "VOICE_RATE": 160,
+  "VOICE_VOLUME": 1.0,
+  "ONE_AUDIO_LENGTH": 6.0,
+  "IN_INTERVAL": 3.0,
+  "SEND_TIME": 10.0,
+  "TEMPERATURE": 0.7,
+  "TOP_P": 0.95,
+  "NUM_PREDICT": 256
+}

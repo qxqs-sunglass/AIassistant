@@ -1,0 +1,4 @@
+[2026-01-16 21:52:56] [WARNING] [OllamaClient] 测试Ollama连接...
+[2026-01-16 21:52:58] [INFO] [OllamaClient] ✅ Ollama连接正常
+[2026-01-16 21:52:58] [INFO] [OllamaClient] ✅ Gemma3-1b模型已加载
+[2026-01-16 21:53:13] [ERROR] [OllamaClient] 错误: 400
