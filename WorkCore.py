@@ -71,43 +71,58 @@ class WorkCore(threading.Thread):
 
         # 处理指令
         for msg in data:  # 处理每条消息
-            logger.log(f"发送AI:\n{self.RC.FIRST_PROMPT_S + msg + self.RC.FIRST_PROMPT}", self.ID, "INFO")
+            # logger.log(f"发送AI:\n{self.RC.FIRST_PROMPT_S + msg + self.RC.FIRST_PROMPT}", self.ID, "INFO")
             ans: str = self.OLLAMA.send(self.RC.FIRST_PROMPT_S + msg + self.RC.FIRST_PROMPT)  # 发送消息到ollama客户端
-            ans = ans.replace("\n", "")
-            logger.log(f"收到AI回复:{ans}", self.ID, "INFO")
-
-            if ans == "Yes":
-                logger.log(f"收到确认指令:{msg}", self.ID, "INFO")
-                # 二轮处理：寻找指令集
-                ans: str = self.OLLAMA.send("当前文本：" + msg + PROMPT_S)  # 发送消息到ollama客户端
-                # 三轮处理：索引相关api
-                ans: str = ans.replace("\n", "")
-                ans: str = self.OLLAMA.send("当前文本" + f"{msg}" + self.module_dict[ans].WorkWord + PROMPT_E)
-                # 处理指令集
-                # 清理回复，提取JSON
-                # ans = self.analysis_json(ans)
-                logger.log(f"收到AI回复:{ans}", self.ID, "INFO")
-            elif ans == "No":
+            # logger.log(f"收到AI回复:{ans}", self.ID, "INFO")
+            if ans == "NO":
                 logger.log(f"收到拒绝指令:{msg}", self.ID, "INFO")
-            else:
+                continue
+            elif ans != "Yes":
                 logger.log(f"输出出错：{ans}", self.ID, "ERROR")
+
+            logger.log(f"收到确认指令:{msg}", self.ID, "INFO")
+
+            # 二轮处理：寻找指令集
+            ans: str = self.OLLAMA.send("当前文本：" + msg + PROMPT_S)  # 发送消息到ollama客户端
+            logger.log(f"收到确认指令:{ans}", self.ID, "INFO")
+            if ans == 'None':
+                continue
+
+            # 三轮处理：索引相关api
+            msg: str = self.OLLAMA.send("当前文本" + f"{msg}" + self.module_dict[ans].WorkWord + PROMPT_E)
+            # 处理指令集
+            # 清理回复，提取JSON
+            res = self.analysis_json(msg)
+            if not res["res"]:  # 目标不存在
+                logger.log("目标不存在", self.ID, "INFO")
+                continue
+            if res["command"] not in self.module_dict[ans].Work_dict.keys():
+                logger.log("指令集中无对应指令", self.ID, "INFO")
+                continue
+
+            self.module_dict[ans].temp = res["parameters"]
+            logger.log("执行指令中", self.ID, "INFO")
+            self.module_dict[ans].Work_dict[res["command"]]()
+            logger.log(f"命令执行完成", self.ID, "INFO")
 
         self.SPH.reply_send()  # 回复处理完成
 
     @staticmethod
-    def analysis_json(msg):
+    def analysis_json(msg) -> dict:
         try:
-            result = msg.json()
-            response_text = result.get("response", "").strip()
-
+            result = json.loads(msg)
+            result["res"] = True
+            info = f"输出结果：{result}, 对象类型{type(result)}, 访问字段command:{result['command']}"
+            logger.log(info, "WorkCore", "INFO")
+            return result
         except json.JSONDecodeError as e:
-            print("❌ JSON解析失败:", e)
-            return None
+            logger.log(f"❌ JSON解析失败:{e}", "WorkCore", "ERROR")
+            return {"res": False}
         except Exception as e:
-            print("❌ LLM解析失败:", e)
-            return None
+            logger.log(f"❌ LLM解析失败:{e}", "WorkCore", "ERROR")
+            return {"res": False}
 
-        return None
+        return {}
 
     def chat_dispose(self):
         """

@@ -11,17 +11,34 @@ class WinMedia:
     VK_VOLUME_MUTE = 0xAD
     VK_VOLUME_DOWN = 0xAE
     VK_VOLUME_UP = 0xAF
-    WorkWord = """
 
-        适用于媒体控制的函数：
-        - play_pause()  播放/暂停
-        - next_track()  下一首
-        - previous_track()  上一首
-        - volume_mute()  静音
-        - volume_down()  音量减小
-        - volume_up()  音量增加
-    
-    """
+    def __init__(self):
+        self.WorkWord = """
+            适用于媒体控制的函数：
+            - play_pause()  播放/暂停
+            - next_track()  下一首/换歌/切换歌曲
+            - previous_track()  上一首
+            - volume_mute()  静音
+            - volume_down()  音量减小
+            - volume_up()  音量增加
+            特殊情况：
+            文本中若是提到换歌，或是切换歌曲指的都是next_tract()
+        """
+        self.Work_dict = {
+            "play_pause()": self.play_pause,
+            "play_pause": self.play_pause,
+            "next_track()": self.next_track,
+            "next_track": self.next_track,
+            "previous_track()": self.previous_track,
+            "previous_track": self.previous_track,
+            "volume_mute()": self.volume_mute,
+            "volume_mute": self.volume_mute,
+            "volume_down()": self.volume_down,
+            "volume_down": self.volume_down,
+            "volume_up()": self.volume_up,
+            "volume_up": self.volume_up
+        }
+        self.temp = ""
 
     @staticmethod
     def send_media_key(key_code):

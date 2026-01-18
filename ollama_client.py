@@ -95,7 +95,9 @@ class OllamaClient:
             response = requests.post(self.RC.SEND_MESSAGE_URL, json=payload, timeout=120)
             if response.status_code == 200:
                 result = response.json()
-                self.output = result.get("response", "")
+                msg: str = result.get("response", "")
+                msg = msg.replace("\n", "")
+                self.output = msg
                 self.doing_active = False
                 return self.output
             else:
@@ -151,6 +153,7 @@ class OllamaClient:
             if response.status_code == 200:
                 result = response.json()
                 ai_response = result.get("message", {}).get("content", "")
+                ai_response = ai_response.replace("\n", "")
 
                 # 添加AI回复到历史
                 if ai_response:
