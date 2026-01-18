@@ -21,45 +21,18 @@ SYSTEM_PROMPT: str = """
 """
 
 PROMPT_S = """
+|基于以上文本，通过以下标签和文本指向的标签，输出属于文本的对应标签|
 支持的操作类型(严格遵守)：
 1. 系统控制：SYS_C (关机、重启、锁定)
 2. 媒体控制：MEDIA_C (播放/暂停、下一首、上一首)
+
+输出回答时，只需要输出对应的标签。
 """
 
 PROMPT_E = """
+|根据以上文本，目标文档给出的api，请严格按照以下格式，输出消息|
 指令格式：
-{{"action": "操作类型", "command": "具体命令", "confidence": 信心度浮点数, "parameters": "额外参数(可选)"}}
-
-规则：
-1. action必须是"open_app"、"system_control"、"volume_control"、"media_control"、"key_press"、"network_query"中的一个
-2. command必须是上述已知的命令或应用名称
-3. confidence必须是0.0到1.0之间的浮点数
-4. 如果用户要打开的应用不在已知列表中，command设为"unknown"
-5. 对于天气查询，如果用户没有明确指定城市，parameters设为空字符串""
-6. 对于搜索查询，parameters可以包含搜索关键词
-7. 对于新闻查询，parameters可以包含新闻类型（如科技、体育等）
-8. 对于包含城市的天气查询（如"北京天气"），parameters设为城市名（如"北京"）
-9. 对于不包含城市的天气查询（如"天气如何"），parameters设为空字符串""
-10. 对于"暂停"、"播放"、"暂停播放"等指令，command必须是"play_pause"
-11. 对于"音量调至X"、"设置音量到X"等指令，command必须是"set_volume"，parameters设为数字（如"25"、"50"）
-
-示例：
-用户说："今天天气怎么样" → {{"action": "network_query", "command": "weather", "confidence": 0.95, "parameters": ""}}
-用户说："北京天气" → {{"action": "network_query", "command": "weather", "confidence": 0.95, "parameters": "北京"}}
-用户说："天气如何" → {{"action": "network_query", "command": "weather", "confidence": 0.95, "parameters": ""}}
-用户说："暂停" → {{"action": "media_control", "command": "play_pause", "confidence": 0.98, "parameters": ""}}
-用户说："播放" → {{"action": "media_control", "command": "play_pause", "confidence": 0.98, "parameters": ""}}
-用户说："pause" → {{"action": "media_control", "command": "play_pause", "confidence": 0.98, "parameters": ""}}
-用户说："下一首" → {{"action": "media_control", "command": "next", "confidence": 0.98, "parameters": ""}}
-用户说："上一首" → {{"action": "media_control", "command": "previous", "confidence": 0.98, "parameters": ""}}
-用户说："音量调至25" → {{"action": "volume_control", "command": "set_volume", "confidence": 0.95, "parameters": "25"}}
-用户说："设置音量到50%" → {{"action": "volume_control", "command": "set_volume", "confidence": 0.95, "parameters": "50"}}
-用户说："把音量调到75" → {{"action": "volume_control", "command": "set_volume", "confidence": 0.95, "parameters": "75"}}
-用户说："静音" → {{"action": "volume_control", "command": "volume_mute", "confidence": 0.95, "parameters": ""}}
-
-用户指令："{user_input}"
-
-只输出JSON：
+{{"command": "具体命令", "parameters": "额外参数(可选)", "reply_say": "回复话语"}}
 """
 
 DEPEND = """

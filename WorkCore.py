@@ -1,4 +1,5 @@
 from module.media import media_controller
+from module.SYS_C import SYS_C
 from Config import PROMPT_S, PROMPT_E
 import threading
 import Logger
@@ -23,6 +24,7 @@ class WorkCore(threading.Thread):
         self.TTS = self.master.tts_engine  # 语音合成器
         self.OLLAMA = self.master.ollama_client  # ollama客户端
         self.media_controller = media_controller  # 媒体控制器
+        self.system_control = SYS_C  # 系统控制器
 
         self.msg = ""  # 消息
         self.mode = "CMD_MODE"  # 模式
@@ -34,7 +36,10 @@ class WorkCore(threading.Thread):
             "CMD_MODE": self.cmd_dispose,
             "CHAT_MODE": self.chat_dispose
         }  # 处理消息的字典
-        self.control_commands = PROMPT_S + self.media_controller.WorkWord + PROMPT_E  # 控制指令集
+        self.module_dict = {
+            "MEDIA_C": self.media_controller,
+            "SYS_C": self.system_control
+        }
 
     def run(self):
         """
@@ -73,11 +78,14 @@ class WorkCore(threading.Thread):
 
             if ans == "Yes":
                 logger.log(f"收到确认指令:{msg}", self.ID, "INFO")
-                # 二轮处理
-                ans: str = self.OLLAMA.send(["当前文本：" + msg, self.control_commands])  # 发送消息到ollama客户端
+                # 二轮处理：寻找指令集
+                ans: str = self.OLLAMA.send("当前文本：" + msg + PROMPT_S)  # 发送消息到ollama客户端
+                # 三轮处理：索引相关api
+                ans: str = ans.replace("\n", "")
+                ans: str = self.OLLAMA.send("当前文本" + f"{msg}" + self.module_dict[ans].WorkWord + PROMPT_E)
                 # 处理指令集
                 # 清理回复，提取JSON
-                ans = self.analysis_json(ans)
+                # ans = self.analysis_json(ans)
                 logger.log(f"收到AI回复:{ans}", self.ID, "INFO")
             elif ans == "No":
                 logger.log(f"收到拒绝指令:{msg}", self.ID, "INFO")
@@ -91,40 +99,6 @@ class WorkCore(threading.Thread):
         try:
             result = msg.json()
             response_text = result.get("response", "").strip()
-
-            # 安全打印，避免格式化错误
-            print("🤖 LLM回复:", response_text)
-
-            # 清理回复，提取JSON
-            response_text = response_text.replace('```json', '').replace('```', '').strip()
-
-            # 提取JSON部分
-            start = response_text.find('{')
-            end = response_text.rfind('}') + 1
-
-            if start != -1 and end != 0:
-                json_str = response_text[start:end]
-                command_info = json.loads(json_str)
-
-                # 验证必要字段
-                if "action" not in command_info or "command" not in command_info:
-                    print("❌ LLM返回缺少必要字段")
-                    return None
-
-                # 确保confidence是浮点数
-                if "confidence" in command_info:
-                    try:
-                        if isinstance(command_info["confidence"], str):
-                            command_info["confidence"] = float(command_info["confidence"])
-                        command_info["confidence"] = max(0.0, min(1.0, float(command_info["confidence"])))
-                    except (ValueError, TypeError):
-                        command_info["confidence"] = 0.7
-                else:
-                    command_info["confidence"] = 0.7
-
-                # 安全打印
-                print("✅ 解析成功:", command_info)
-                return command_info
 
         except json.JSONDecodeError as e:
             print("❌ JSON解析失败:", e)

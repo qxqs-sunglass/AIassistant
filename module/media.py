@@ -12,6 +12,7 @@ class WinMedia:
     VK_VOLUME_DOWN = 0xAE
     VK_VOLUME_UP = 0xAF
     WorkWord = """
+
         适用于媒体控制的函数：
         - play_pause()  播放/暂停
         - next_track()  下一首
@@ -19,6 +20,7 @@ class WinMedia:
         - volume_mute()  静音
         - volume_down()  音量减小
         - volume_up()  音量增加
+    
     """
 
     @staticmethod

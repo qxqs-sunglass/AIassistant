@@ -56,16 +56,39 @@ class OllamaClient:
         发送消息到ollama
         适用于指令模式
         """
-        payload = {
-            "model": self.RC.DEFAULT_MODEL,
-            "prompt": message,
-            "stream": False,
-            "options": {
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "num_predict": 512  # Gemma3-1b建议值
+        if type(message) is str:
+            payload = {
+                "model": self.RC.DEFAULT_MODEL,
+                "prompt": message,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "top_p": 0.95,
+                    "num_predict": 512
+                }
             }
-        }
+        elif type(message) is list:
+            data = []
+            for msg in message:
+                data.append(
+                    {
+                        "role": "user",
+                        "content": msg
+                    }
+                )
+            payload = {
+                "model": self.RC.DEFAULT_MODEL,
+                "messages": data,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "num_predict": 512  # Gemma3-1b建议值
+                }
+            }
+        else:
+            logger.log(f"格式错误：{message}", self.ID, "ERROR")
+            return None
 
         try:
             self.doing_active = True
@@ -73,6 +96,7 @@ class OllamaClient:
             if response.status_code == 200:
                 result = response.json()
                 self.output = result.get("response", "")
+                self.doing_active = False
                 return self.output
             else:
                 self.doing_active = False
@@ -101,6 +125,9 @@ class OllamaClient:
                         "content": msg
                     }
                 )
+        else:
+            logger.log(f"输出错误：{user_message}", self.ID, "ERROR")
+            return None
 
         # 限制历史长度（避免超过模型上下文）
         if len(self.conversation_history) > 10:
