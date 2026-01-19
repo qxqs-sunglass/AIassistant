@@ -13,5 +13,6 @@
   "SEND_TIME": 10.0,
   "TEMPERATURE": 0.7,
   "TOP_P": 0.95,
-  "NUM_PREDICT": 256
+  "NUM_PREDICT": 256,
+  "confidence_threshold": 70
 }

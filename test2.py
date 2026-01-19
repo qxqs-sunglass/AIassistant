@@ -1,15 +1,12 @@
 import os
+import pathlib
 
 
-# 直接启动快捷方式
-def launch_shortcut(lnk_path):
-    try:
-        os.startfile(lnk_path)
-        return True
-    except Exception as e:
-        print(f"启动失败: {e}")
-        return False
-
-
-# 示例：启动Chrome快捷方式
-launch_shortcut(r"C:\Users\黄文浩\Desktop\酷狗音乐.lnk")
+app_dict = {}
+path = pathlib.Path.home().joinpath("Desktop")
+print(path)
+for filename in os.listdir(path):
+    name = filename.split(".")[0]
+    if filename.endswith(".lnk"):
+        app_dict[name] = f"{path}\\{filename}"
+print(app_dict)

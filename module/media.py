@@ -12,7 +12,7 @@ class WinMedia:
     VK_VOLUME_DOWN = 0xAE
     VK_VOLUME_UP = 0xAF
 
-    def __init__(self):
+    def __init__(self, master):
         self.WorkWord = """
             适用于媒体控制的函数：
             - play_pause()  播放/暂停
@@ -178,18 +178,8 @@ class KeyMedia:
             return False
 
 
-# 选择最佳的控制器
-def get_media_controller():
-    """获取媒体控制器"""
-    return WinMedia()
-
-
-# 全局媒体控制器实例
-media_controller = get_media_controller()
-
-
-def test_media_controls():
-    """测试媒体控制功能"""
+"""def test_media_controls():
+    "测试媒体控制功能"
     print("🔍 测试媒体控制功能...")
 
     # 测试播放/暂停
@@ -218,4 +208,4 @@ def test_media_controls():
 
 
 if __name__ == "__main__":
-    test_media_controls()
+    test_media_controls()"""

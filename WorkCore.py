@@ -1,5 +1,4 @@
-from module.media import media_controller
-from module.SYS_C import SYS_C
+from module import WinMedia, SYS_C
 from Config import PROMPT_S, PROMPT_E
 import threading
 import Logger
@@ -23,8 +22,9 @@ class WorkCore(threading.Thread):
         self.SPH = self.master.speech_recognizer  # 语音识别器
         self.TTS = self.master.tts_engine  # 语音合成器
         self.OLLAMA = self.master.ollama_client  # ollama客户端
-        self.media_controller = media_controller  # 媒体控制器
-        self.system_control = SYS_C  # 系统控制器
+        self.media_controller = WinMedia(self)  # 媒体控制器
+        self.system_control = SYS_C(self)  # 系统控制器
+        self.system_control.init()
 
         self.msg = ""  # 消息
         self.mode = "CMD_MODE"  # 模式
@@ -71,14 +71,14 @@ class WorkCore(threading.Thread):
 
         # 处理指令
         for msg in data:  # 处理每条消息
-            # logger.log(f"发送AI:\n{self.RC.FIRST_PROMPT_S + msg + self.RC.FIRST_PROMPT}", self.ID, "INFO")
+            logger.log(f"发送AI(此处不包含提示词):\n{msg}", self.ID, "INFO")
             ans: str = self.OLLAMA.send(self.RC.FIRST_PROMPT_S + msg + self.RC.FIRST_PROMPT)  # 发送消息到ollama客户端
             # logger.log(f"收到AI回复:{ans}", self.ID, "INFO")
-            if ans == "NO":
-                logger.log(f"收到拒绝指令:{msg}", self.ID, "INFO")
+            if ans == "No":
+                logger.log(f"收到拒绝指令:{msg}\n", self.ID, "INFO")
                 continue
             elif ans != "Yes":
-                logger.log(f"输出出错：{ans}", self.ID, "ERROR")
+                logger.log(f"输出出错：{ans}\n", self.ID, "ERROR")
 
             logger.log(f"收到确认指令:{msg}", self.ID, "INFO")
 
@@ -102,7 +102,7 @@ class WorkCore(threading.Thread):
 
             self.module_dict[ans].temp = res["parameters"]
             logger.log("执行指令中", self.ID, "INFO")
-            self.module_dict[ans].Work_dict[res["command"]]()
+            # self.module_dict[ans].Work_dict[res["command"]]()
             logger.log(f"命令执行完成", self.ID, "INFO")
 
         self.SPH.reply_send()  # 回复处理完成
@@ -112,7 +112,11 @@ class WorkCore(threading.Thread):
         try:
             result = json.loads(msg)
             result["res"] = True
-            info = f"输出结果：{result}, 对象类型{type(result)}, 访问字段command:{result['command']}"
+            info = f"""
+            输出结果：{result},
+            对象类型{type(result)},
+            访问字段command:{result['command']}
+            """
             logger.log(info, "WorkCore", "INFO")
             return result
         except json.JSONDecodeError as e:
@@ -121,8 +125,6 @@ class WorkCore(threading.Thread):
         except Exception as e:
             logger.log(f"❌ LLM解析失败:{e}", "WorkCore", "ERROR")
             return {"res": False}
-
-        return {}
 
     def chat_dispose(self):
         """
