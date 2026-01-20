@@ -13,6 +13,7 @@ class WinMedia:
     VK_VOLUME_UP = 0xAF
 
     def __init__(self, master):
+        self.intro = "系统控制：SYS_C (控制系统相关操作：关机、重启、锁定、打开应用程序等)"
         self.WorkWord = """
             适用于媒体控制的函数：
             - play_pause()  播放/暂停
@@ -39,6 +40,12 @@ class WinMedia:
             "volume_up": self.volume_up
         }
         self.temp = ""
+
+    def init(self):
+        """
+        无
+        :return:
+        """
 
     @staticmethod
     def send_media_key(key_code):
@@ -145,6 +152,9 @@ class KeyMedia:
         - volume_down()  音量减小
         - volume_up()  音量增加
     """
+
+    def init(self):
+        """pass"""
 
 
     @staticmethod

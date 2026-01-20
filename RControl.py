@@ -38,21 +38,13 @@ class RControl:
         self.TEMPERATURE: float = 0.7
         self.TOP_P: float = 0.9
         self.NUM_PREDICT: int = 1000
-        # AI提示词
-        self.SYSTEM_PROMPT: str = """
-        你是一个智能语音助手，回答要简洁、友好、有帮助。
-        你的特点是：
-            1. 回答简洁明了，每句话不要太长
-            2. 用友好、自然的语气
-            3. 中文回答为主，偶尔可以夹杂英文术语
-            4. 如果不懂就诚实说不知道
-            5. 避免使用复杂格式，纯文本回复
-        """
-        self.FIRST_PROMPT_S: str = """
-        当前文本："""
-        self.FIRST_PROMPT: str = f"""
-        |根据文本内容，判断{self.AI_NAME}（有谐音的可能）的存在，请回答：Yes或No|
-        """  # ai第一轮提炼提示
+        self.FIRST_PROMPT_1: str = f"""
+|根据文本内容，判断{self.AI_NAME}（有谐音的可能）是否存在，如果没有请直接输出：None
+并基于以上文本，通过以下标签和文本指向的标签，输出属于文本的对应标签，如果没有对应标签对应则输出：None|
+支持的操作类型(严格遵守)："""
+        self.FIRST_PROMPT_2 = """
+输出回答时，只需要输出对应的标签。
+        """  # ai第一轮提炼提示 注：相关操作类型必须在mod中标出，指定的位置为:self.intro
         # 注：第三轮为函数操作，为了方便，所以会在指定的module中制定提示词 名称为：WorkWord
 
     def init_config(self):
@@ -63,6 +55,7 @@ class RControl:
         self.SEND_MESSAGE_URL: str = f"{self.OLLAMA_HOST}/api/generate"
         self.TEST_RUL = f"{self.OLLAMA_HOST}/api/tags"
         self.CHAR_RUL = f"{self.OLLAMA_HOST}/api/chat"
+        self.loading()
 
     def run(self):
         pass

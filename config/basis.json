@@ -2,7 +2,7 @@
   "__version__": "0.1.0：demo version",
   "__author__": "@bilibili_秋天会有下雪天",
   "OLLAMA_HOST": "http://localhost:11434",
-  "DEFAULT_MODEL": "gemma3:1b",
+  "DEFAULT_MODEL": "deepseek-r1:1.5b",
   "AI_NAME": "小黄同学",
   "LOOP_INTERVAL": 0.3,
   "SPEECH_LANGUAGE": "zh-CN",

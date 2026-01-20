@@ -1,5 +1,5 @@
-from module import WinMedia, SYS_C
-from Config import PROMPT_S, PROMPT_E
+from module import API_instance
+from Config import PROMPT_E, PROMPT_F
 import threading
 import Logger
 import json
@@ -22,9 +22,18 @@ class WorkCore(threading.Thread):
         self.SPH = self.master.speech_recognizer  # 语音识别器
         self.TTS = self.master.tts_engine  # 语音合成器
         self.OLLAMA = self.master.ollama_client  # ollama客户端
-        self.media_controller = WinMedia(self)  # 媒体控制器
-        self.system_control = SYS_C(self)  # 系统控制器
-        self.system_control.init()
+
+        self.module_dict = {}  # 存放实例处
+        self.module_intro = []  # api简介
+        # 导入api
+        for name, ins in API_instance.items():
+            self.module_dict[name] = ins()  # 动态导入
+            self.module_intro.append(self.module_dict[name].intro)
+
+        temp = self.RC.FIRST_PROMPT_1
+        for m in range(len(self.module_intro)):
+            temp = f"{temp}\n{m}.{self.module_intro[m]}"  # 上一句\n下一句
+        self.FIRST_PROMPT = temp + self.RC.FIRST_PROMPT_2
 
         self.msg = ""  # 消息
         self.mode = "CMD_MODE"  # 模式
@@ -36,10 +45,6 @@ class WorkCore(threading.Thread):
             "CMD_MODE": self.cmd_dispose,
             "CHAT_MODE": self.chat_dispose
         }  # 处理消息的字典
-        self.module_dict = {
-            "MEDIA_C": self.media_controller,
-            "SYS_C": self.system_control
-        }
 
     def run(self):
         """
@@ -71,21 +76,15 @@ class WorkCore(threading.Thread):
 
         # 处理指令
         for msg in data:  # 处理每条消息
+            # 一轮处理，得出是否继续执行，并索引对应module
             logger.log(f"发送AI(此处不包含提示词):\n{msg}", self.ID, "INFO")
-            ans: str = self.OLLAMA.send(self.RC.FIRST_PROMPT_S + msg + self.RC.FIRST_PROMPT)  # 发送消息到ollama客户端
+            ans: str = self.OLLAMA.send(PROMPT_F + msg + self.FIRST_PROMPT)  # 发送消息到ollama客户端
             # logger.log(f"收到AI回复:{ans}", self.ID, "INFO")
-            if ans == "No":
-                logger.log(f"收到拒绝指令:{msg}\n", self.ID, "INFO")
-                continue
-            elif ans != "Yes":
-                logger.log(f"输出出错：{ans}\n", self.ID, "ERROR")
-
             logger.log(f"收到确认指令:{msg}", self.ID, "INFO")
-
-            # 二轮处理：寻找指令集
-            ans: str = self.OLLAMA.send("当前文本：" + msg + PROMPT_S)  # 发送消息到ollama客户端
-            logger.log(f"收到确认指令:{ans}", self.ID, "INFO")
             if ans == 'None':
+                continue
+            if ans not in self.module_dict.keys():  # 是否存在相关实例
+                logger.log(f"目标不存在：{ans}", self.ID, "INFO")
                 continue
 
             # 三轮处理：索引相关api

@@ -12,6 +12,7 @@ class SYS_C:
         """
         系统控制类
         """
+        self.intro = "媒体控制：MEDIA_C (控制音乐或其他媒体的：播放/暂停、下一首、上一首)"
         self.master = master
         self.WorkWord = """
         适用于系统控制的函数：

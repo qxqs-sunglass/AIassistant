@@ -46,6 +46,7 @@ class OllamaClient:
     def update(self):
         """更新展示的内容"""
         print("-"*20)
+        print(f"当前使用模型：{self.RC.DEFAULT_MODEL}")
         print(f"当前历史记录长度: {len(self.conversation_history)}")
         if self.doing_active:
             print("正在与Ollama聊天...")
@@ -84,7 +85,8 @@ class OllamaClient:
                     "temperature": 0.7,
                     "top_p": 0.9,
                     "num_predict": 512  # Gemma3-1b建议值
-                }
+                },
+                "think": False
             }
         else:
             logger.log(f"格式错误：{message}", self.ID, "ERROR")
@@ -139,6 +141,7 @@ class OllamaClient:
             "model": self.RC.DEFAULT_MODEL,
             "messages": self.conversation_history,
             "stream": False,
+            "think": False,
             "options": {
                 "temperature": 0.7,
                 "top_p": 0.95,
