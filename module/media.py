@@ -12,7 +12,7 @@ class WinMedia:
     VK_VOLUME_DOWN = 0xAE
     VK_VOLUME_UP = 0xAF
 
-    def __init__(self, master):
+    def __init__(self):
         self.intro = "系统控制：SYS_C (控制系统相关操作：关机、重启、锁定、打开应用程序等)"
         self.WorkWord = """
             适用于媒体控制的函数：

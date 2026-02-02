@@ -1,3 +1,5 @@
+from typing import Any
+
 from module import API_instance
 from Config import PROMPT_E, PROMPT_F
 import threading
@@ -32,19 +34,16 @@ class WorkCore(threading.Thread):
 
         temp = self.RC.FIRST_PROMPT_1
         for m in range(len(self.module_intro)):
-            temp = f"{temp}\n{m}.{self.module_intro[m]}"  # 上一句\n下一句
+            temp = f"{temp}\n{m+1}.{self.module_intro[m]}"  # 上一句\n下一句
         self.FIRST_PROMPT = temp + self.RC.FIRST_PROMPT_2
+        logger.log(self.FIRST_PROMPT, self.ID, "INFO")
 
-        self.msg = ""  # 消息
+        self.msg_now = "" # 当前消息
         self.mode = "CMD_MODE"  # 模式
         # 聊天模式：CHAT_MODE
         # 指令模式：CMD_MODE
         # 注：更换模式由AI助手控制
         self.active = True  # 工作核心是否激活
-        self.dispose_dict = {
-            "CMD_MODE": self.cmd_dispose,
-            "CHAT_MODE": self.chat_dispose
-        }  # 处理消息的字典
 
     def run(self):
         """
@@ -53,7 +52,7 @@ class WorkCore(threading.Thread):
         """
         logger.log("工作核心线程启动", self.ID, "INFO")
         while self.active:
-            self.dispose_dict[self.mode]()  # 调用相应的处理函数
+            self.dispose()
             time.sleep(self.RC.LOOP_INTERVAL)
 
     def update(self):
@@ -63,8 +62,9 @@ class WorkCore(threading.Thread):
         """
         print("-"*20)
         print(f"当前模式{self.mode}")
+        print(f"当前处理：{self.msg_now}")
 
-    def cmd_dispose(self):
+    def dispose(self):
         """
         命令模式处理消息单元
         函数即代表一次处理
@@ -77,60 +77,73 @@ class WorkCore(threading.Thread):
         # 处理指令
         for msg in data:  # 处理每条消息
             # 一轮处理，得出是否继续执行，并索引对应module
-            logger.log(f"发送AI(此处不包含提示词):\n{msg}", self.ID, "INFO")
-            ans: str = self.OLLAMA.send(PROMPT_F + msg + self.FIRST_PROMPT)  # 发送消息到ollama客户端
-            # logger.log(f"收到AI回复:{ans}", self.ID, "INFO")
-            logger.log(f"收到确认指令:{msg}", self.ID, "INFO")
-            if ans == 'None':
-                continue
+            logger.log("-"*20, self.ID, "INFO")
+            t1 = time.time()  # 记录时间
+            self.msg_now = msg
+            # 第一次提炼
+            logger.log(f"发送AI(此处不包含提示词):\t{msg}", self.ID, "INFO")
+            temp: str = self.OLLAMA.send(PROMPT_F + msg + self.FIRST_PROMPT)  # 发送消息到ollama客户端
+            logger.log(f"收到AI回复:{temp}", self.ID, "INFO")
+            temp: dict = self.analysis_json(temp)
+            ans = temp.get("ans", "None")
             if ans not in self.module_dict.keys():  # 是否存在相关实例
-                logger.log(f"目标不存在：{ans}", self.ID, "INFO")
+                logger.log(f"err: 无目标索引：{ans}", self.ID, "INFO")
+                t2 = time.time()
+                logger.log(f"用时：{t2-t1}", self.ID, "INFO")
                 continue
 
-            # 三轮处理：索引相关api
-            msg: str = self.OLLAMA.send("当前文本" + f"{msg}" + self.module_dict[ans].WorkWord + PROMPT_E)
+            # 二轮处理：索引相关api
+            msg: str = self.OLLAMA.send("当前文本：" + f"{msg}" + self.module_dict[ans].WorkWord + PROMPT_E)
             # 处理指令集
             # 清理回复，提取JSON
             res = self.analysis_json(msg)
-            if not res["res"]:  # 目标不存在
-                logger.log("目标不存在", self.ID, "INFO")
-                continue
-            if res["command"] not in self.module_dict[ans].Work_dict.keys():
-                logger.log("指令集中无对应指令", self.ID, "INFO")
+            if (
+                    not res["res"]  # 否定
+                    or res["command"] not in self.module_dict[ans].Work_dict.keys()  # 不存在
+                ):  # 目标不存在
+                logger.log(f"err: 目标不存在{res['res']}", self.ID, "INFO")
+                t2 = time.time()
+                logger.log(f"用时：{t2-t1}", self.ID, "INFO")
                 continue
 
             self.module_dict[ans].temp = res["parameters"]
             logger.log("执行指令中", self.ID, "INFO")
             # self.module_dict[ans].Work_dict[res["command"]]()
             logger.log(f"命令执行完成", self.ID, "INFO")
+            t2 = time.time()
+            logger.log(f"用时：{t2-t1}", self.ID, "INFO")
 
         self.SPH.reply_send()  # 回复处理完成
 
     @staticmethod
-    def analysis_json(msg) -> dict:
+    def analysis_json(msg) -> dict[str, bool] | None | Any:
         try:
-            result = json.loads(msg)
-            result["res"] = True
-            info = f"""
-            输出结果：{result},
-            对象类型{type(result)},
-            访问字段command:{result['command']}
-            """
-            logger.log(info, "WorkCore", "INFO")
-            return result
+            num_d = []
+            count = 0
+            for s in range(len(msg)):
+                if msg[s] == "{":
+                    count += 1
+                    num_d.append(s)
+                elif msg[s] == "}":
+                    count -= 1
+                    num_d.append(s)
+            if count == 0 and len(num_d)%2==0:
+                msg = msg[num_d[0]: num_d[-1]+1]  # 设置msg索引
+                result = json.loads(msg)
+                result["res"] = True
+                info = f"""
+                输出结果：{result},
+                对象类型{type(result)},
+                """
+                logger.log(info, "WorkCore", "INFO")
+                return result
+            return {"res": False}
         except json.JSONDecodeError as e:
             logger.log(f"❌ JSON解析失败:{e}", "WorkCore", "ERROR")
             return {"res": False}
         except Exception as e:
             logger.log(f"❌ LLM解析失败:{e}", "WorkCore", "ERROR")
             return {"res": False}
-
-    def chat_dispose(self):
-        """
-        聊天模式处理消息单元
-        函数即代表一次处理
-        :return:
-        """
 
     def obtain_msg(self, msg):
         """
@@ -146,7 +159,3 @@ class WorkCore(threading.Thread):
         """
         logger.log(f"{self.ID}, 自检响应成功", ID, "INFO")
         return True
-
-    @staticmethod
-    def occupation():
-        """占位使用，无实际用途"""

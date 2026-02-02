@@ -4,16 +4,12 @@ import json
 import os
 
 
-logger = Logger.Logger()
-
-
 class SYS_C:
-    def __init__(self, master):
+    def __init__(self):
         """
         系统控制类
         """
         self.intro = "媒体控制：MEDIA_C (控制音乐或其他媒体的：播放/暂停、下一首、上一首)"
-        self.master = master
         self.WorkWord = """
         适用于系统控制的函数：
         - open_app()  打开指定应用
@@ -66,8 +62,8 @@ class SYS_C:
         """
         try:
             os.startfile(self.temp)
-        except Exception as e:
-            logger.log(f"{e}", self.master.ID, "INFO")
+        except Exception:
+            return None
 
     def shutdown_s(self):
         """
