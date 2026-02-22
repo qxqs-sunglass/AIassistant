@@ -48,20 +48,8 @@ class RControl:
             n.init()
             self.module_dict[name] = n  # 动态导入
             self.module_intro.append(self.module_dict[name].intro)
-
-        self.FIRST_PROMPT_1: str = f"""
-|你必须基于一下规则回答文本的问题：
-1.只有带有'{self.AI_NAME}'字段的文本，才能对json格式中，键"active"的值修改为:true，否则只能为：false
-2.针对文本，通过比对操作类型表，输出属于文本的对应标签（英文+大写）
-3.请严格按照json格式输出（输出的指令内所有键必须为英文字符并使用英文的引号）
-4.不用给出思考过程，请直接给出结果|
-操作类型表："""
-        self.FIRST_PROMPT_2: str = """
-输出示例：
-{"ans": "MEDIA_C","active": true}  # 有目标字段，有指向操作
-{"ans": "None", "active": False}  # 无目标字段
-{"ans": "None", "active": true}  # 有目标字段，无指向操作
-"""
+        self.FIRST_PROMPT_1 = ""
+        self.FIRST_PROMPT_2 = ""
         # ai第一轮提炼提示 注：相关操作类型必须在mod中标出，指定的位置为:self.intro
         # 注：第三轮为函数操作，为了方便，所以会在指定的module中制定提示词 名称为：WorkWord
 
@@ -85,6 +73,20 @@ class RControl:
         except Exception as e:
             logger.log(f"加载基础配置失败，原因：{e}", self.ID, "ERROR")
         logger.log("加载基础配置完成", self.ID, "INFO")
+
+        self.FIRST_PROMPT_1: str = f"""
+        |你必须基于一下规则回答文本的问题：
+        1.只有带有'{self.AI_NAME}'字段的文本，才能对json格式中，键"active"的值修改为:true，否则只能为：false
+        2.针对文本，通过比对操作类型表，输出属于文本的对应标签（英文+大写）
+        3.请严格按照json格式输出（输出的指令内所有键必须为英文字符并使用英文的引号）
+        4.不用给出思考过程，请直接给出结果|
+        操作类型表："""
+        self.FIRST_PROMPT_2: str = """
+        输出示例：
+        {"ans": "MEDIA_C","active": true}  # 有目标字段，有指向操作
+        {"ans": "None", "active": False}  # 无目标字段
+        {"ans": "None", "active": true}  # 有目标字段，无指向操作
+        """
 
     def reply_test(self, ID):
         """

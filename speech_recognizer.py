@@ -158,6 +158,9 @@ class SpeechRecognizer:
                     if text.isspace() or text == "":
                         continue  # 空消息，跳过
 
+                    if self.RC.AI_NAME not in text:
+                        continue
+
                     # 更新消息
                     self.msg = text
                     self.undisposed_num += 1  # 未处理消息数+1
@@ -202,11 +205,15 @@ class SpeechRecognizer:
         """
         if isinstance(msg, list):
             for m in msg:
+                if self.RC.AI_NAME not in m:
+                    continue
                 self.msg_list.append(m)
             self.msg = self.msg_list[-1]
             self.undisposed_num += len(msg)  # 添加未处理消息数
             # logger.log(f"当前消息数：{self.undisposed_num}", self.ID, "INFO")
         else:
+            if self.RC.AI_NAME not in msg:
+                return
             self.msg = msg
             self.msg_list.append(msg)
             self.undisposed_num += 1
