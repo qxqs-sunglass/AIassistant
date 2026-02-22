@@ -11,7 +11,7 @@
   "ONE_AUDIO_LENGTH": 6.0,
   "IN_INTERVAL": 3.0,
   "SEND_TIME": 10.0,
-  "TEMPERATURE": 0.7,
+  "TEMPERATURE": 1,
   "TOP_P": 0.95,
   "NUM_PREDICT": 256,
   "confidence_threshold": 70

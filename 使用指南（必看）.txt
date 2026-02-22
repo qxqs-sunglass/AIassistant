@@ -1,0 +1,22 @@
+目前拥有的功能:
+系统操作一类：
+- 关机
+- 注销
+- 重启
+- 打开应用
+媒体操作:
+- 下一首
+- 上一首
+- 暂停
+- 静音
+- 加音量
+- 减音量
+
+
+注：vosk库需要下载模型，见下面的说明
+模型下载地址：https://alphacephei.com/vosk/models
+下载后解压到~【存放python文件目录/lib/site-packages/speech_recognition/models/vosk】文件夹下
+
+关于应用列表的读取介绍（暂时：
+1.启动test2.py将会生成一段文本，这段json格式的文本就是你桌面上所有的应用列表
+2.将文本复制到config\apps.json中即可(未证实ai是否能基于应用名打开所需要的应用)

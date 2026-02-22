@@ -3,7 +3,13 @@ import pathlib
 
 
 app_dict = {}
-path = pathlib.Path.home().joinpath("Desktop")
+try:
+    path = pathlib.Path.home().joinpath("Desktop")
+except FileNotFoundError:
+    path = pathlib.Path.home().joinpath("OneDrive\\Desktop")
+except Exception as e:
+    print(e)
+    exit(0)
 print(path)
 for filename in os.listdir(path):
     name = filename.split(".")[0]

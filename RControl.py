@@ -1,4 +1,5 @@
 from Config import DEFAULT_PATH, PATH_DICT
+from module import API_instance
 import Logger
 import json
 import os
@@ -38,14 +39,23 @@ class RControl:
         self.TEMPERATURE: float = 0.7
         self.TOP_P: float = 0.9
         self.NUM_PREDICT: int = 1000
+
+        self.module_dict = {}  # api实例
+        self.module_intro = []  # api介绍
+        # 导入api
+        for name, ins in API_instance.items():
+            n = ins()
+            n.init()
+            self.module_dict[name] = n  # 动态导入
+            self.module_intro.append(self.module_dict[name].intro)
+
         self.FIRST_PROMPT_1: str = f"""
 |你必须基于一下规则回答文本的问题：
 1.只有带有'{self.AI_NAME}'字段的文本，才能对json格式中，键"active"的值修改为:true，否则只能为：false
 2.针对文本，通过比对操作类型表，输出属于文本的对应标签（英文+大写）
-3.输出的结果只能含有json格式的指令
-4.不用给出思考过程，请直接给出答案|
-操作类型表：
-"""
+3.请严格按照json格式输出（输出的指令内所有键必须为英文字符并使用英文的引号）
+4.不用给出思考过程，请直接给出结果|
+操作类型表："""
         self.FIRST_PROMPT_2: str = """
 输出示例：
 {"ans": "MEDIA_C","active": true}  # 有目标字段，有指向操作

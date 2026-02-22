@@ -24,12 +24,8 @@ class WorkCore(threading.Thread):
         self.TTS = self.master.tts_engine  # 语音合成器
         self.OLLAMA = self.master.ollama_client  # ollama客户端
 
-        self.module_dict = {}  # 存放实例处
-        self.module_intro = []  # api简介
-        # 导入api
-        for name, ins in API_instance.items():
-            self.module_dict[name] = ins()  # 动态导入
-            self.module_intro.append(self.module_dict[name].intro)
+        self.module_dict = self.RC.module_dict  # 存放实例处
+        self.module_intro = self.RC.module_intro  # api简介
 
         temp = self.RC.FIRST_PROMPT_1
         for m in range(len(self.module_intro)):
@@ -132,22 +128,12 @@ class WorkCore(threading.Thread):
                     logger.log(f"用时: {t2 - t1:.2f}秒", self.ID, "INFO")
                     self.msg_now = ""
                     continue
-
+                # 指令
                 command = res.get("command", "")  # 目标指令
-                if not command or command not in module.Work_dict.keys():  # 判断逻辑
-                    logger.log(f"❌ 指令不存在或无效: {command}", self.ID, "ERROR")
-                    logger.log(f"可用指令: {list(module.Work_dict.keys())}", self.ID, "DEBUG")
-                    t2 = time.time()
-                    logger.log(f"用时: {t2 - t1:.2f}秒", self.ID, "INFO")
-                    self.msg_now = ""
-                    continue
-
                 # 执行指令
                 logger.log(f"执行指令: {command}，参数: {res.get('parameters', [])}", self.ID, "INFO")
-
                 # 设置参数
                 module.temp = res.get("parameters", [])
-
                 # 执行指令
                 if command in module.Work_dict:
                     try:
@@ -157,7 +143,7 @@ class WorkCore(threading.Thread):
                         # 如果有回复，可以语音输出
                         reply_say = res.get("reply_say", "")
                         if reply_say and self.TTS:
-                            self.TTS.say(reply_say)
+                            self.TTS.say_text(reply_say)
                     except Exception as e:
                         logger.log(f"❌ 执行指令 {command} 失败: {e}", self.ID, "ERROR")
                 else:

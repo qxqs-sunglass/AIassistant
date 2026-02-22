@@ -41,10 +41,18 @@ class SYS_C:
         with open("config\\apps.json", "r", encoding="utf-8") as f:
             tempdata: dict = json.load(f)
             f.close()
-        if tempdata.get("f", False):
+        if not tempdata.get("f", False):
             # f值为false则代表第一次启动
             # 第一次启动扫描一遍桌面
-            desktop = pathlib.Path.home().joinpath("Desktop")
+            desktop = "ERROR"
+            try:
+                desktop = pathlib.Path.home().joinpath("Desktop")
+            except FileNotFoundError:
+                desktop = pathlib.Path.home().joinpath("OneDrive\\Desktop")
+            except Exception as e:
+                print(e)
+            if desktop == "ERROR":
+                return
             for filename in os.listdir(desktop):
                 name = filename.split(".")[0]
                 if filename.endswith(".lnk"):

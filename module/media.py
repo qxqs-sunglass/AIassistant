@@ -46,6 +46,7 @@ class WinMedia:
         无
         :return:
         """
+        return
 
     @staticmethod
     def send_media_key(key_code):
