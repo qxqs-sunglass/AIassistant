@@ -1,8 +1,7 @@
-from typing import Any
-
 from module import API_instance
-from Config import PROMPT_E, PROMPT_F
+from Config import PROMPT_E
 import threading
+import re
 import Logger
 import json
 import time
@@ -80,70 +79,161 @@ class WorkCore(threading.Thread):
             logger.log("-"*20, self.ID, "INFO")
             t1 = time.time()  # 记录时间
             self.msg_now = msg
-            # 第一次提炼
-            logger.log(f"发送AI(此处不包含提示词):\t{msg}", self.ID, "INFO")
-            temp: str = self.OLLAMA.send(PROMPT_F + msg + self.FIRST_PROMPT)  # 发送消息到ollama客户端
-            logger.log(f"收到AI回复:{temp}", self.ID, "INFO")
-            temp: dict = self.analysis_json(temp)
-            ans = temp.get("ans", "None")
-            if ans not in self.module_dict.keys():  # 是否存在相关实例
-                logger.log(f"err: 无目标索引：{ans}", self.ID, "INFO")
-                t2 = time.time()
-                logger.log(f"用时：{t2-t1}", self.ID, "INFO")
+
+            # 跳过空消息
+            if not msg or msg.strip() == "":
                 continue
 
-            # 二轮处理：索引相关api
-            msg: str = self.OLLAMA.send("当前文本：" + f"{msg}" + self.module_dict[ans].WorkWord + PROMPT_E)
-            # 处理指令集
-            # 清理回复，提取JSON
-            res = self.analysis_json(msg)
-            if (
-                    not res["res"]  # 否定
-                    or res["command"] not in self.module_dict[ans].Work_dict.keys()  # 不存在
-                ):  # 目标不存在
-                logger.log(f"err: 目标不存在{res['res']}", self.ID, "INFO")
-                t2 = time.time()
-                logger.log(f"用时：{t2-t1}", self.ID, "INFO")
-                continue
+            try:
+                # 第一次提炼 - 确定使用哪个模块
+                prompt = self.FIRST_PROMPT + msg  # 指令
+                logger.log(f"发送到AI(包含提示词): {prompt[:100]}...", self.ID, "DEBUG")
 
-            self.module_dict[ans].temp = res["parameters"]
-            logger.log("执行指令中", self.ID, "INFO")
-            # self.module_dict[ans].Work_dict[res["command"]]()
-            logger.log(f"命令执行完成", self.ID, "INFO")
-            t2 = time.time()
-            logger.log(f"用时：{t2-t1}", self.ID, "INFO")
+                temp_response = self.OLLAMA.send(prompt)
+                logger.log(f"AI首次回复: {temp_response}", self.ID, "INFO")
+
+                temp_result = self.analysis_json(temp_response)
+
+                if not temp_result.get("res", False):
+                    logger.log("❌ AI首次回复无法解析为有效JSON", self.ID, "WARNING")
+                    self.msg_now = ""
+                    continue
+
+                ans = temp_result.get("ans", "None")
+
+                if ans is None or ans == "None":
+                    logger.log(f"⚠️ 未找到匹配模块: {msg}", self.ID, "INFO")
+                    t2 = time.time()
+                    logger.log(f"用时: {t2 - t1:.2f}秒", self.ID, "INFO")
+                    self.msg_now = ""
+                    continue
+
+                if ans not in self.module_dict.keys():
+                    logger.log(f"❌ 模块不存在: {ans}", self.ID, "ERROR")
+                    t2 = time.time()
+                    logger.log(f"用时: {t2 - t1:.2f}秒", self.ID, "INFO")
+                    self.msg_now = ""
+                    continue
+
+                # 第二轮处理 - 执行具体指令
+                module = self.module_dict[ans]
+                second_prompt = f"{PROMPT_E}{msg}\n{module.WorkWord}"
+                logger.log(f"发送到模块 {ans}: {second_prompt[:100]}...", self.ID, "DEBUG")
+
+                second_response = self.OLLAMA.send(second_prompt)
+                logger.log(f"模块 {ans} 回复: {second_response}", self.ID, "INFO")
+
+                res = self.analysis_json(second_response)
+
+                if not res.get("res", False):
+                    logger.log(f"❌ 模块 {ans} 回复无法解析为有效JSON", self.ID, "ERROR")
+                    t2 = time.time()
+                    logger.log(f"用时: {t2 - t1:.2f}秒", self.ID, "INFO")
+                    self.msg_now = ""
+                    continue
+
+                command = res.get("command", "")
+                if not command or command not in module.Work_dict.keys():
+                    logger.log(f"❌ 指令不存在或无效: {command}", self.ID, "ERROR")
+                    logger.log(f"可用指令: {list(module.Work_dict.keys())}", self.ID, "DEBUG")
+                    t2 = time.time()
+                    logger.log(f"用时: {t2 - t1:.2f}秒", self.ID, "INFO")
+                    self.msg_now = ""
+                    continue
+
+                # 执行指令
+                logger.log(f"执行指令: {command}，参数: {res.get('parameters', [])}", self.ID, "INFO")
+
+                # 设置参数
+                module.temp = res.get("parameters", [])
+
+                # 执行指令
+                if command in module.Work_dict:
+                    try:
+                        module.Work_dict[command]()
+                        logger.log(f"✅ 指令 {command} 执行完成", self.ID, "INFO")
+
+                        # 如果有回复，可以语音输出
+                        reply_say = res.get("reply_say", "")
+                        if reply_say and self.TTS:
+                            self.TTS.say(reply_say)
+                    except Exception as e:
+                        logger.log(f"❌ 执行指令 {command} 失败: {e}", self.ID, "ERROR")
+                else:
+                    logger.log(f"❌ 指令 {command} 未在模块中定义", self.ID, "ERROR")
+
+                t2 = time.time()
+                logger.log(f"总用时: {t2 - t1:.2f}秒", self.ID, "INFO")
+
+            except Exception as e:
+                logger.log(f"❌ 处理消息异常: {e}", self.ID, "ERROR")
+                t2 = time.time()
+                logger.log(f"用时: {t2 - t1:.2f}秒", self.ID, "INFO")
+
+            self.msg_now = ""
 
         self.SPH.reply_send()  # 回复处理完成
 
-    @staticmethod
-    def analysis_json(msg) -> dict[str, bool] | None | Any:
+    def analysis_json(self, msg: str) -> dict:
+        """
+        增强的JSON解析方法，处理多种格式
+        """
+        if not msg:
+            return {"res": False}
+
+        # 清理消息
+        msg = msg.strip()
+
+        # 移除代码块标记
+        if msg.startswith("```json"):
+            msg = msg[7:]
+        if msg.endswith("```"):
+            msg = msg[:-3]
+        msg = msg.strip()
+
+        # 尝试直接解析
         try:
-            num_d = []
-            count = 0
-            for s in range(len(msg)):
-                if msg[s] == "{":
-                    count += 1
-                    num_d.append(s)
-                elif msg[s] == "}":
-                    count -= 1
-                    num_d.append(s)
-            if count == 0 and len(num_d)%2==0:
-                msg = msg[num_d[0]: num_d[-1]+1]  # 设置msg索引
-                result = json.loads(msg)
+            result = json.loads(msg)
+            result["res"] = True
+            logger.log(f"✅ JSON解析成功: {result}", "WorkCore", "DEBUG")
+            return result
+        except json.JSONDecodeError:
+            pass
+
+        # 尝试修复常见的JSON格式问题
+        try:
+            # 修复属性名缺少双引号的问题
+            fixed_msg = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', msg)
+            # 修复字符串值中的单引号
+            fixed_msg = re.sub(r":\s*'([^']*)'", r': "\1"', fixed_msg)
+
+            result = json.loads(fixed_msg)
+            result["res"] = True
+            logger.log(f"✅ JSON修复后解析成功: {result}", "WorkCore", "DEBUG")
+            return result
+        except (json.JSONDecodeError, Exception):
+            pass
+
+        # 最后尝试提取大括号内的内容
+        try:
+            start = msg.find("{")
+            end = msg.rfind("}")
+
+            if start != -1 and end != -1 and start < end:
+                json_str = msg[start:end + 1]
+                # 再次尝试修复和解析
+                fixed_json = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', json_str)
+                fixed_json = re.sub(r":\s*'([^']*)'", r': "\1"', fixed_json)
+
+                result = json.loads(fixed_json)
                 result["res"] = True
-                info = f"""
-                输出结果：{result},
-                对象类型{type(result)},
-                """
-                logger.log(info, "WorkCore", "INFO")
+                logger.log(f"✅ 提取并修复JSON成功: {result}", "WorkCore", "DEBUG")
                 return result
-            return {"res": False}
-        except json.JSONDecodeError as e:
-            logger.log(f"❌ JSON解析失败:{e}", "WorkCore", "ERROR")
-            return {"res": False}
-        except Exception as e:
-            logger.log(f"❌ LLM解析失败:{e}", "WorkCore", "ERROR")
-            return {"res": False}
+        except Exception:
+            pass
+
+        logger.log(f"❌ JSON解析失败: {msg}", "WorkCore", "WARNING")
+        return {"res": False}
 
     def obtain_msg(self, msg):
         """

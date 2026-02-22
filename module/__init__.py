@@ -9,6 +9,7 @@ API_instance = {
 }  # 对外部暴露的api实例
 __all__ = [
     "WinMedia", "KeyMedia", "SYS_C",
+    "API_instance",
     "__version__",
     "__author__",
 ]

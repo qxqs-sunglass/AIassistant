@@ -39,13 +39,18 @@ class RControl:
         self.TOP_P: float = 0.9
         self.NUM_PREDICT: int = 1000
         self.FIRST_PROMPT_1: str = f"""
-|根据文本内容，判断{self.AI_NAME}（有谐音的可能）是否存在，如果没有输出：None（即：无类型）
-并基于以上文本，通过以下标签和文本指向的标签，输出属于文本的对应标签，如果没有请输出：对应操作类型标签
-不用给出思考过程，请直接给出答案|
-支持的操作类型（严格遵守）："""
+|你必须基于一下规则回答文本的问题：
+1.只有带有'{self.AI_NAME}'字段的文本，才能对json格式中，键"active"的值修改为:true，否则只能为：false
+2.针对文本，通过比对操作类型表，输出属于文本的对应标签（英文+大写）
+3.输出的结果只能含有json格式的指令
+4.不用给出思考过程，请直接给出答案|
+操作类型表：
+"""
         self.FIRST_PROMPT_2: str = """
-输出格式为json结构，且在输出的指令中所有标点符号必须为英文字符，请严格按照一下格式输出指令：
-{ans: "目标类型"}
+输出示例：
+{"ans": "MEDIA_C","active": true}  # 有目标字段，有指向操作
+{"ans": "None", "active": False}  # 无目标字段
+{"ans": "None", "active": true}  # 有目标字段，无指向操作
 """
         # ai第一轮提炼提示 注：相关操作类型必须在mod中标出，指定的位置为:self.intro
         # 注：第三轮为函数操作，为了方便，所以会在指定的module中制定提示词 名称为：WorkWord
@@ -58,15 +63,7 @@ class RControl:
         self.SEND_MESSAGE_URL: str = f"{self.OLLAMA_HOST}/api/generate"
         self.TEST_RUL = f"{self.OLLAMA_HOST}/api/tags"
         self.CHAR_RUL = f"{self.OLLAMA_HOST}/api/chat"
-        self.loading()
-
-    def run(self):
-        pass
-
-    def update(self):
-        pass
-
-    def loading(self):
+        # loading
         logger.log("开始加载配置", self.ID, "INFO")
         logger.log("加载基础配置", self.ID, "INFO")
         try:
