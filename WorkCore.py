@@ -87,7 +87,7 @@ class WorkCore(threading.Thread):
             try:
                 # 第一次提炼 - 确定使用哪个模块
                 prompt = self.FIRST_PROMPT + msg  # 指令
-                logger.log(f"发送到AI(包含提示词): {prompt[:100]}...", self.ID, "DEBUG")
+                logger.log(f"发送到AI: {msg}", self.ID, "INFO")
 
                 temp_response = self.OLLAMA.send(prompt)
                 logger.log(f"AI首次回复: {temp_response}", self.ID, "INFO")
@@ -99,10 +99,11 @@ class WorkCore(threading.Thread):
                     self.msg_now = ""
                     continue
 
-                ans = temp_result.get("ans", "None")
+                ans = temp_result.get("ans", "None")  # 目标
+                active = temp_result.get("active", False)  # 状态
 
-                if ans is None or ans == "None":
-                    logger.log(f"⚠️ 未找到匹配模块: {msg}", self.ID, "INFO")
+                if not active:
+                    logger.log(f"⚠️ 拒绝执行: {msg}", self.ID, "INFO")
                     t2 = time.time()
                     logger.log(f"用时: {t2 - t1:.2f}秒", self.ID, "INFO")
                     self.msg_now = ""
@@ -123,7 +124,7 @@ class WorkCore(threading.Thread):
                 second_response = self.OLLAMA.send(second_prompt)
                 logger.log(f"模块 {ans} 回复: {second_response}", self.ID, "INFO")
 
-                res = self.analysis_json(second_response)
+                res = self.analysis_json(second_response)  # 指令解析
 
                 if not res.get("res", False):
                     logger.log(f"❌ 模块 {ans} 回复无法解析为有效JSON", self.ID, "ERROR")
@@ -132,8 +133,8 @@ class WorkCore(threading.Thread):
                     self.msg_now = ""
                     continue
 
-                command = res.get("command", "")
-                if not command or command not in module.Work_dict.keys():
+                command = res.get("command", "")  # 目标指令
+                if not command or command not in module.Work_dict.keys():  # 判断逻辑
                     logger.log(f"❌ 指令不存在或无效: {command}", self.ID, "ERROR")
                     logger.log(f"可用指令: {list(module.Work_dict.keys())}", self.ID, "DEBUG")
                     t2 = time.time()
