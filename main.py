@@ -1,5 +1,5 @@
 from RControl import RControl
-from ollama_client import OllamaClient
+from AI_client import AIClient
 from speech_recognizer import SpeechRecognizer
 from tts_engine import TTSEngine
 from WorkCore import WorkCore
@@ -29,7 +29,7 @@ class Main:
         self.receive = Receive(self)  # 创建接收线程对象
 
         # 创建各个模块对象
-        self.ollama_client = OllamaClient(self)  # Ollama客户端
+        self.ollama_client = AIClient(self)  # Ollama客户端
         self.speech_recognizer = SpeechRecognizer(self)  # 语音识别器
         self.tts_engine = TTSEngine(self)  # 语音合成器
         self.work_core = WorkCore(self)  # 工作核心

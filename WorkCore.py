@@ -1,5 +1,3 @@
-from module import API_instance
-from Config import PROMPT_E
 import threading
 import re
 import Logger
@@ -114,7 +112,7 @@ class WorkCore(threading.Thread):
 
                 # 第二轮处理 - 执行具体指令
                 module = self.module_dict[ans]
-                second_prompt = f"{PROMPT_E}{msg}\n{module.WorkWord}"
+                second_prompt = f"{self.RC.PROMPT_E}{msg}\n{module.WorkWord}"
                 logger.log(f"发送到模块 {ans}: {second_prompt[:100]}...", self.ID, "DEBUG")
 
                 second_response = self.OLLAMA.send(second_prompt)

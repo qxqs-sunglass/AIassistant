@@ -56,7 +56,7 @@ class SYS_C:
             for filename in os.listdir(desktop):
                 name = filename.split(".")[0]
                 if filename.endswith(".lnk"):
-                    self.app_dict[name] = f"{desktop}\\{filename}"
+                    self.app_dict[name] = [f"{desktop}\\{filename}"]
             with open(f"config\\apps.json", "w", encoding="utf-8") as f:
                 json.dump(self.app_dict, f, ensure_ascii=False, indent=4)
                 f.close()

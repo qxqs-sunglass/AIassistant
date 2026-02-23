@@ -1,17 +1,18 @@
 import requests
+import openai
 import Logger
 
 
 logger = Logger.get_logger()
 
 
-class OllamaClient:
+class AIClient:
     def __init__(self, master):
         """
         ollama 的链接客户端
         :param master:
         """
-        self.ID = "OllamaClient"
+        self.ID = "AIClient"
         self.master = master
         self.RC = self.master.RC
 
