@@ -16,7 +16,7 @@ class RControl:
         """
         self.ID = "RControl"
         self.master = master
-
+        # 本地ai部署使用
         self.DEFAULT_PATH = DEFAULT_PATH
         self.PATH_DICT = PATH_DICT
         self.OLLAMA_HOST = "http://localhost:11434"
@@ -56,8 +56,13 @@ class RControl:
         self.PROMPT_E = ""
         # ai第一轮提炼提示 注：相关操作类型必须在mod中标出，指定的位置为:self.intro
         # 注：第三轮为函数操作，为了方便，所以会在指定的module中制定提示词 名称为：WorkWord
-
-        self.openai_api = ""
+        # 联网ai，deepseek、chat-GPT
+        self.openai_api = ""  # 用户使用的api
+        self.basis_url = ""  # 目标网址
+        self.openai_module = ""  # 主选ai大模型
+        self.openai_module_minor = ""  # 次选ai大模型
+        self.openai_tools = []  # 工具
+        self.openai_active = "normal"  # ai状态
 
     def init_config(self):
         """
@@ -101,21 +106,8 @@ class RControl:
 {"ans": "MEDIA_C"}  # 文本内容指向了MEDIA_C
 {"ans": "SYS_C"}  # 文本内容指向了SYS_C
 """
-        self.OPENAI_PROMPT: str = """|你必须基于一下规则回答文本的问题：
-1.针对文本，通过比对操作类型表，输出属于文本的对应标签（冒号右侧的大写英文）
-2.请严格按照json格式输出指令（输出的指令内所有键和值如果是字符串类型，则必须使用英文字符和英文的引号）
-指令格式：
-{"ans": 目标操作类型}|
-操作类型表："""
-        self.PROMPT_E = """
-|请根据一下规则输出指令：
-1.根据指令，比对目标文档给出的api，严格按照文档内容输出具体指令（英文的函数名），若没有就不需要输出。
-2.在文档中，目标函数如果有额外标出需要的参数，需要给出
-3.根据这次回复给出信心值（这次指令符合文本内容的程度）
-4.请严格按照以下格式（格式为json格式，且在输出的指令内所键必须为英文字符并使用英文的引号）|
-指令格式：
-{"command": "具体命令", "parameters": "额外参数", "reply_say": "回复话语", "confidence": 具体数值(0~100)(不自信~自信)}
-用户指令:
+        self.OPENAI_PROMPT: str = """|针对用户指令，结合tools中的工具，目的是完成指令内容，如果指令内容没有对应的tool，请回答：抱歉我听不懂。|
+指令：
 """
 
     def reply_test(self, ID):

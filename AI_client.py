@@ -1,5 +1,5 @@
+from openai import OpenAI
 import requests
-import openai
 import Logger
 
 
@@ -20,6 +20,7 @@ class AIClient:
         self.doing_active = False
 
         self.output = ""
+        self.openai = None
 
     def run(self):
         """运行"""
@@ -43,6 +44,13 @@ class AIClient:
         except:
             logger.log("❌ 无法连接到Ollama", self.ID, "ERROR")
             logger.log("请先启动Ollama服务: ollama serve", self.ID, "INFO")
+        try:
+            self.openai = OpenAI(
+                api_key=self.RC.openai_api,
+                base_url=self.RC.basis_url
+            )
+        except:
+            logger.log("❌ 无法连接到openai", self.ID, "ERROR")
 
     def update(self):
         """更新展示的内容"""
@@ -61,7 +69,7 @@ class AIClient:
         if type(message) is str:
             payload = {
                 "model": self.RC.DEFAULT_MODEL,
-                "prompt": message,
+                "prompt": message,  # 一条信息这里只需要str就行
                 "stream": False,
                 "options": {
                     "temperature": 0.7,
@@ -111,6 +119,12 @@ class AIClient:
             self.doing_active = False
             logger.log(f"请求失败: {e}", self.ID, "ERROR")
             return None
+
+    def get_module(self, name):
+        """获取指定module的"""
+        if name not in self.RC.module_dict.keys():
+            return {"res": "ERROR"}
+        return self.RC.module_dict[name]
 
     def stop(self):
         """停止"""
