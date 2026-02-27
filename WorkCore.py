@@ -62,6 +62,7 @@ class WorkCore(threading.Thread):
         命令模式处理消息单元
         函数即代表一次处理
         :return:
+        备注：主要重构；做tag分离。（2026.2.27）
         """
         data: list = self.SPH.get_msg()
         if len(data) == 0:  # 没有收到消息
@@ -219,6 +220,9 @@ class WorkCore(threading.Thread):
 
         logger.log(f"❌ JSON解析失败: {msg}", "WorkCore", "WARNING")
         return {"res": False}
+
+    def use_command(self, command: str):
+        """调佣指令"""
 
     def obtain_msg(self, msg):
         """

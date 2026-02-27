@@ -1,8 +1,6 @@
 {
   "__version__": "0.1.0：demo version",
   "__author__": "@bilibili_秋天会有下雪天",
-  "OLLAMA_HOST": "http://localhost:11434",
-  "DEFAULT_MODEL": "deepseek-r1:1.5b",
   "AI_NAME": "小平同学",
   "LOOP_INTERVAL": 0.3,
   "SPEECH_LANGUAGE": "zh-CN",
@@ -14,5 +12,7 @@
   "TEMPERATURE": 0.7,
   "TOP_P": 0.95,
   "NUM_PREDICT": 256,
-  "confidence_threshold": 70
+  "confidence_threshold": 70,
+  "ai_list": ["ollama", "openai"],
+  "tag": "openai"
 }
