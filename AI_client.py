@@ -54,8 +54,10 @@ class AIClient:
         这里发送的str可以直接发送
         list类型的格式为:[["msg", "role], ["msg", "role"], ...]
         """
+        if not self.RC.ai_active:  # ai无法使用
+            return {"res": "ERROR"}
         payload = self.package_dict[self.RC.tag](message)
-        if "error" in payload:
+        if "error" in payload:  # 错误信息
             return payload
         res = self.send_dict[self.RC.tag](payload)
         logger.log(f"发送指令{message}", self.ID, "INFO")

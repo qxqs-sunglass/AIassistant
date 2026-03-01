@@ -2,6 +2,7 @@ from Config import DEFAULT_PATH, PATH_DICT
 from module import API_instance
 import requests
 import Logger
+import openai
 import json
 import os
 
@@ -39,11 +40,6 @@ class RControl:
         self.TOP_P: float = 0.9
         self.NUM_PREDICT: int = 1000
 
-        # ollam设置
-        self.OLLAMA_HOST = "http://localhost:11434"
-        self.DEFAULT_MODEL: str = "gemma3:1b"
-        self.ollama_active = True  # ai当前状态
-
         # 系统api设置
         self.module_dict = {}  # api实例
         self.module_intro = []  # api介绍
@@ -70,9 +66,18 @@ class RControl:
         self.openai_tools = []  # 工具
         self.openai_active = True  # ai状态 true表示使用状态
         self.HANDERS = {}  # 链接测试工具
-
+        # 设置
+        self.model_data = {}
+        self.key_data = {}
         self.ai_list = []
-        self.tag = "openai"
+        self.tag = "openai"  # 当前使用的ai模型
+        self.key_active = True  # openai需要的API key
+        self.ai_active = True  # 确认是否有可运行的ai
+
+        self.test_connect_dict = {
+            "openai": self.test_connect_openai,
+            "ollama": self.test_connect_ollama
+        }
 
     def init_config(self):
         """
@@ -91,34 +96,47 @@ class RControl:
         except Exception as e:
             logger.log(f"加载基础配置失败，原因：{e}", self.ID, "ERROR")
 
-        # 加载ollama设置
+        # 加载ai_key
         try:
-            with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["OPENAI"]), "r", encoding="utf-8") as f:
-                openai_dict = json.load(f)
+            with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["KEY"]), "r", encoding="utf-8") as f:
+                self.key_data = json.load(f)
                 f.close()
-            for key, value in openai_dict.items():
-                setattr(self, key, value)
+            logger.log("已成功加载key.json文件", self.ID, "INFO")
         except Exception as e:
-            logger.log(f"用户未正确配置openai设置，{e}", self.ID, "ERROR")
-            self.ollama_active = False
+            self.key_active = False
+            logger.log(f"用户未配置key.json，{e}", self.ID, "ERROR")
 
-        # 加载openai设置
+        # 加载ai模型设置
         try:
-            with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["OPENAI"]), "r", encoding="utf-8") as f:
-                openai_dict = json.load(f)
+            with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["AI_MODEL"]), "r", encoding="utf-8") as f:
+                data = json.load(f)
                 f.close()
-            for key, value in openai_dict.items():
-                setattr(self, key, value)
+            for aim in data:
+                if aim.get("ai_type", "None") == "openai" and self.key_active:
+                    name = aim.get("name", "None")
+                    if name == "None":
+                        aim["active"] = False
+                        continue
+
+                    aim["key"] = self.key_data["name"]  # 获取key
+                    aim["client"] = openai.OpenAI(
+                        api_key=aim["key"],
+                        base_url=aim["base_url"]
+                    )
+
+                    aim["active"] = True
+                elif aim["ai_type"] == "ollama":
+                    aim["SEND_MESSAGE_URL"] = f"{aim['OLLAMA_HOST']}/api/generate"  # 发送消息的api
+                    aim["TEST_RUL"] = f"{aim['OLLAMA_HOST']}/api/tags"  # 获取模型列表的api
+
+                    aim["active"] = True
+                else:
+                    aim["active"] = False
+
+                self.model_data[aim["name"]] = aim  #  保存数据
         except Exception as e:
-            logger.log(f"用户未正确配置openai设置，{e}", self.ID, "ERROR")
-            self.openai_active = False
+            logger.log(f"用户未正确配置ai_model.json，{e}", self.ID, "ERROR")
         logger.log("加载基础配置完成", self.ID, "INFO")
-
-        # 系统信息配置
-        # 相关url
-        self.SEND_MESSAGE_URL: str = f"{self.OLLAMA_HOST}/api/generate"
-        self.TEST_RUL1 = f"{self.OLLAMA_HOST}/api/tags"
-        self.CHAR_RUL = f"{self.OLLAMA_HOST}/api/chat"
 
         # 设置提示词
         self.FIRST_PROMPT_1: str = f"""
@@ -138,6 +156,15 @@ class RControl:
     def RC_verify(self):
         """资源校验"""
         # 先测试Ollama连接
+        for key, value in self.model_data:
+            ai_type = value.get("ai_type", "None")
+            if ai_type == "None" or not value.get("active", False):  # 无法使用或为配置ai_type
+                continue
+            self.test_connect_dict.get(ai_type)(key)
+
+
+    def test_connect_ollama(self, model_name: str):
+        """测试ai连接_ollama"""
         logger.log("测试Ollama连接...", self.ID, "WARNING")
         try:
             test_response = requests.get(self.TEST_RUL1, timeout=5)
@@ -147,33 +174,19 @@ class RControl:
                 models = test_response.json().get('models', [])
                 model_names = [m['name'] for m in models]
 
-                if self.DEFAULT_MODEL in model_names:
-                    logger.log(f"✅ {self.DEFAULT_MODEL}模型已加载", self.ID, "INFO")
+                if model_name in model_names:
+                    logger.log(f"✅ {model_name}模型已加载", self.ID, "INFO")
                 else:
-                    logger.log(f"❌ 未找到{self.DEFAULT_MODEL}模型", self.ID, "ERROR")
-                    logger.log(f"请运行: ollama pull {self.DEFAULT_MODEL}", self.ID, "INFO")
+                    logger.log(f"❌ 未找到{model_name}模型", self.ID, "ERROR")
+                    logger.log(f"请运行: ollama pull {model_name}", self.ID, "INFO")
             else:
                 logger.log("❌ Ollama服务异常", self.ID, "ERROR")
         except:
             logger.log("❌ 无法连接到Ollama", self.ID, "ERROR")
             logger.log("请先启动Ollama服务: ollama serve", self.ID, "INFO")
-        # 测试链接openai
-        try:
-            res = requests.get(self.TEST_RUL2, timeout=5)
-            if res.status_code == 200:
-                logger.log(f"已与目标正常链接", self.ID, "INFO")
-                models = res.json().get('models', [])
-                model_names = [m['name'] for m in models]
 
-                if self.openai_module in model_names:
-                    logger.log(f"✅ {self.openai_module}模型已加载", self.ID, "INFO")
-                else:
-                    logger.log(f"❌ 未找到{self.openai_module}模型", self.ID, "ERROR")
-                    logger.log(f"请运行: ollama pull {self.openai_module}", self.ID, "INFO")
-            else:
-                logger.log("❌ 请检查openai_basis.json配置项", self.ID, "ERROR")
-        except:
-            logger.log("❌ 无法连接到openai", self.ID, "ERROR")
+    def test_connect_openai(self, model_name: str, AIType: str):
+        """测试openai连接"""
 
     def charge_tag(self, tag: str=""):
         """切换tag"""

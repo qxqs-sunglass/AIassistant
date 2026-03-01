@@ -13,6 +13,5 @@
   "TOP_P": 0.95,
   "NUM_PREDICT": 256,
   "confidence_threshold": 70,
-  "ai_list": ["ollama", "openai"],
-  "tag": "openai"
+  "tag": "DeepSeek-V3.2"
 }

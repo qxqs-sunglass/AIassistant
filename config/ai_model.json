@@ -1,0 +1,18 @@
+[
+  {
+    "ai_type": "openai",
+    "name": "DeepSeek-V3.2",
+    "basis_url": "https://api.deepseek.com",
+    "openai_module": "deepseek-chat",
+    "openai_module_minor": "deepseek-reasoner",
+    "HEADERS": {
+      "Accept": "application/json",
+      "Authorization": ""
+    }
+  },
+  {
+    "ai_type": "ollama",
+    "OLLAMA_HOST": "http://localhost:11434",
+    "DEFAULT_MODEL": "deepseek-r1:1.5b"
+  }
+]

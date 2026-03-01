@@ -7,7 +7,8 @@ LOOP_INTERVAL = 0.7
 DEFAULT_PATH = "config\\"
 PATH_DICT = {
     "BASIS": "basis.json",
-    "OpenAI": "openai_basis.json"
+    "AI_MODEL": "ai_model.json",
+    "KEY": "key.json",
 }
 
 
