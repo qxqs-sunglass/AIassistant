@@ -23,10 +23,6 @@ class RControl:
         self.PATH_DICT = PATH_DICT
         self.AI_NAME: str = "小平同学"
         self.LOOP_INTERVAL = 0.7
-        # 相关url
-        self.SEND_MESSAGE_URL: str = f""  # 发送消息url
-        self.TEST_RUL1: str = f""  # 链接测试url
-        self.CHAR_RUL: str = f""  # 聊天url
         # 语音配置
         self.SPEECH_LANGUAGE: str = "zh-CN"  # 中文
         self.VOICE_RATE: int = 160  # 语速
@@ -43,33 +39,19 @@ class RControl:
         # 系统api设置
         self.module_dict = {}  # api实例
         self.module_intro = []  # api介绍
-        # 导入api
-        for name, ins in API_instance.items():
-            n = ins()
-            n.init()
-            self.module_dict[name] = n  # 动态导入
-            self.module_intro.append(self.module_dict[name].intro)
 
-        # 提炼提示
-        self.FIRST_PROMPT_1 = ""
-        self.OPENAI_PROMPT = ""
-        self.FIRST_PROMPT_2 = ""
-        self.PROMPT_E = ""
         # ai第一轮提炼提示 注：相关操作类型必须在mod中标出，指定的位置为:self.intro
         # 注：第三轮为函数操作，为了方便，所以会在指定的module中制定提示词 名称为：WorkWord
         # 联网ai：deepseek、chat-GPT
-        self.openai_api = ""  # 用户使用的api
-        self.basis_url = ""  # 目标网址
-        self.TEST_RUL2 = ""  # 测试链接用的网址（一般使用余额查询）
-        self.openai_module = ""  # 主选ai大模型
-        self.openai_module_minor = ""  # 次选ai大模型
-        self.openai_tools = []  # 工具
-        self.openai_active = True  # ai状态 true表示使用状态
-        self.HANDERS = {}  # 链接测试工具
+        self.tools = []  # 工具，给ai使用
+        # 注：这里是负责控制ai_client.py中对ai发送消息的状态变量，是否启用该项发送消息
+        self.openai_active = True  # openai接口的链接状态 true表示使用状态
+        self.ollama_active = True   # 工具ollama链接状态
         # 设置
         self.model_data = {}
+        # 特别标注：openai的实例被放在的目标模型下的client标签中
         self.key_data = {}
-        self.ai_list = []
+        self.ai_list = []  # 记录可用ai的tag
         self.tag = "openai"  # 当前使用的ai模型
         self.key_active = True  # openai需要的API key
         self.ai_active = True  # 确认是否有可运行的ai
@@ -90,7 +72,6 @@ class RControl:
         try:
             with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["BASIS"]), "r", encoding="utf-8") as f:
                 basis_dict = json.load(f)
-                f.close()
             for key, value in basis_dict.items():
                 setattr(self, key, value)
         except Exception as e:
@@ -100,7 +81,6 @@ class RControl:
         try:
             with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["KEY"]), "r", encoding="utf-8") as f:
                 self.key_data = json.load(f)
-                f.close()
             logger.log("已成功加载key.json文件", self.ID, "INFO")
         except Exception as e:
             self.key_active = False
@@ -110,26 +90,32 @@ class RControl:
         try:
             with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["AI_MODEL"]), "r", encoding="utf-8") as f:
                 data = json.load(f)
-                f.close()
             for aim in data:
                 if aim.get("ai_type", "None") == "openai" and self.key_active:
                     name = aim.get("name", "None")
+                    key = self.key_data.get(name, None)
+
+                    # 初步校验
                     if name == "None":
                         aim["active"] = False
                         continue
+                    if key is None:  # 无效的key
+                        logger.log(f"ai模型：{name}，无效的key", self.ID, "WARNING")
+                        continue
 
-                    aim["key"] = self.key_data["name"]  # 获取key
                     aim["client"] = openai.OpenAI(
                         api_key=aim["key"],
                         base_url=aim["base_url"]
                     )
 
                     aim["active"] = True
+                    self.ai_list.append([aim["name"], "openai"])
                 elif aim["ai_type"] == "ollama":
                     aim["SEND_MESSAGE_URL"] = f"{aim['OLLAMA_HOST']}/api/generate"  # 发送消息的api
-                    aim["TEST_RUL"] = f"{aim['OLLAMA_HOST']}/api/tags"  # 获取模型列表的api
+                    aim["TEST_URL"] = f"{aim['OLLAMA_HOST']}/api/tags"  # 获取模型列表的api
 
                     aim["active"] = True
+                    self.ai_list.append([aim["name"], "ollama"])
                 else:
                     aim["active"] = False
 
@@ -137,37 +123,28 @@ class RControl:
         except Exception as e:
             logger.log(f"用户未正确配置ai_model.json，{e}", self.ID, "ERROR")
         logger.log("加载基础配置完成", self.ID, "INFO")
-
-        # 设置提示词
-        self.FIRST_PROMPT_1: str = f"""
-|你必须基于一下规则回答文本的问题：
-2.针对文本，通过比对操作类型表，输出属于文本的对应标签（冒号右侧的大写英文）
-3.请严格按照json格式输出（输出的指令内所有键和值如果是字符串类型，则必须使用英文字符和英文的引号）|
-操作类型表："""
-        self.FIRST_PROMPT_2: str = """
-输出示例：
-{"ans": "MEDIA_C"}  # 文本内容指向了MEDIA_C
-{"ans": "SYS_C"}  # 文本内容指向了SYS_C
-"""
-        self.OPENAI_PROMPT: str = """|针对用户指令，结合tools中的工具，目的是完成指令内容，如果指令内容没有对应的tool，请回答：抱歉我听不懂。|
-指令：
-"""
+        # 导入api
+        for name, ins in API_instance.items():
+            n = ins()
+            n.init()
+            self.module_dict[name] = n  # 动态导入
+            self.module_intro.append(self.module_dict[name].intro)
 
     def RC_verify(self):
         """资源校验"""
-        # 先测试Ollama连接
-        for key, value in self.model_data:
-            ai_type = value.get("ai_type", "None")
-            if ai_type == "None" or not value.get("active", False):  # 无法使用或为配置ai_type
-                continue
-            self.test_connect_dict.get(ai_type)(key)
+        self.openai_active = False
+        self.ollama_active = False
+        for item in self.ai_list:
+            name = item[0]
+            ai_type = item[1]
+            self.test_connect_dict.get(ai_type)(self.model_data[name])
 
 
     def test_connect_ollama(self, model_name: str):
         """测试ai连接_ollama"""
         logger.log("测试Ollama连接...", self.ID, "WARNING")
         try:
-            test_response = requests.get(self.TEST_RUL1, timeout=5)
+            test_response = requests.get(self.model_data[model_name]["TEST_URL"], timeout=5)
             if test_response.status_code == 200:
                 logger.log("✅ Ollama连接正常", self.ID, "INFO")
 
@@ -179,31 +156,95 @@ class RControl:
                 else:
                     logger.log(f"❌ 未找到{model_name}模型", self.ID, "ERROR")
                     logger.log(f"请运行: ollama pull {model_name}", self.ID, "INFO")
+
+                self.ollama_active = True
             else:
                 logger.log("❌ Ollama服务异常", self.ID, "ERROR")
         except:
             logger.log("❌ 无法连接到Ollama", self.ID, "ERROR")
             logger.log("请先启动Ollama服务: ollama serve", self.ID, "INFO")
 
-    def test_connect_openai(self, model_name: str, AIType: str):
+    def test_connect_openai(self, model_name: str):
         """测试openai连接"""
+        logger.log("正在进行openai的测试链接", self.ID, "INFO")
+        try:
+            client = self.model_data[model_name]["client"]
+            temp = client.models.list()
+            for m in temp:
+                if self.model_data[model_name]["model"] == m.id:
+                    logger.log(f"✅ {model_name}模型已加载", self.ID, "INFO")
+
+            self.openai_active = True  # 只要有模型能通过测试就算能用
+
+        except openai.APIConnectionError as e:
+            logger.log(f"❌ 连接失败: {e}", self.ID, "ERROR")
+            logger.log("请检查 base_url 是否正确，以及网络是否连通。", self.ID, "ERROR")
+        except openai.AuthenticationError as e:
+            logger.log(f"❌ 认证失败: {e}", self.ID, "ERROR")
+            logger.log("请检查 API Key 是否正确，并且与该 base_url 匹配。", self.ID, "ERROR")
+        except openai.NotFoundError as e:
+            # 可能 base_url 路径不对（例如缺少 /v1），或者模型不存在
+            logger.log(f"❌ 资源未找到 (404): {e}", self.ID, "ERROR")
+            logger.log("请检查 base_url 的格式是否正确（例如是否以 /v1 结尾）。", self.ID, "ERROR")
+        except Exception as e:
+            logger.log(f"❌ 发生了其他错误: {e}", self.ID, "ERROR")
 
     def charge_tag(self, tag: str=""):
         """切换tag"""
         if tag == "":  # 输入为空
-            self.tag = ""
-            for t in self.ai_list:
-                a = getattr(self, t+"_active")
-                if a:  # 是否能运行
-                    self.tag = t
-                else:  # 不能运行就pass
-                    continue
-            if self.tag == "":
-                logger.log("当前无可用ai", self.ID, "ERROR")
+            if len(self.ai_list) <= 0:
+                logger.log("当前无可用ai", self.ID, "WARNING")
+            self.tag = self.ai_list[0][0]  # 索引到目标tag
         elif tag in self.ai_list:  # 调用跳转到当前tag
             self.tag = tag
         else:
+            logger.log(f"无效更改{tag}", self.ID, "WARNING")
             return
+
+    def load(self, path: str, target: str) -> bool | dict:
+        """
+        热加载单元
+        :param path: 文件路径（绝对或相对路径）
+        :param target: 保存数据的地址（变量名）
+        :return:
+        """
+        if not os.path.exists(os.path.join(path)):
+            return {"error": f"不存在的路径：{path}"}
+        p = path.split(".")
+        p = p[-1]
+        if p == "json":
+            with open(os.path.join(path), "r") as f:
+                data = json.load(f)
+            temp = self.__getattribute__(target)  # 为了防止数据丢失，故，先定向后更新
+            temp.update(data)
+            return True
+        elif p == "txt":
+            with open(os.path.join(path), "r") as f:
+                data = f.readlines(8192)  # 只读8mb的内容
+            self.__setattr__(target, data)
+            return True
+        return True
+
+    def save(self, path: str, s_type: str, target: str):
+        """
+        保存文件
+        :param path: 文件路径
+        :param s_type: 保存类型
+        :param target: 目标数值
+        :return:
+        """
+        try:
+            if s_type == "json":
+                with open(os.path.join(path), "w") as f:
+                    json.dump(self.__getattribute__(target), f, indent=2)
+                return True
+            if s_type == "txt":
+                with open(os.path.join(path), "w") as f:
+                    f.write(self.__getattribute__(target))
+                return True
+        except Exception as e:
+            return {"error": f"错误：{e}"}
+        return {"error": f"类型错误{path}"}
 
     def reply_test(self, ID):
         """
