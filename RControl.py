@@ -103,8 +103,9 @@ class RControl:
                         logger.log(f"ai模型：{name}，无效的key", self.ID, "WARNING")
                         continue
 
+                    aim["key"] = key
                     aim["client"] = openai.OpenAI(
-                        api_key=aim["key"],
+                        api_key=key,
                         base_url=aim["base_url"]
                     )
 
@@ -140,22 +141,22 @@ class RControl:
             self.test_connect_dict.get(ai_type)(self.model_data[name])
 
 
-    def test_connect_ollama(self, model_name: str):
+    def test_connect_ollama(self, model: dict):
         """测试ai连接_ollama"""
         logger.log("测试Ollama连接...", self.ID, "WARNING")
         try:
-            test_response = requests.get(self.model_data[model_name]["TEST_URL"], timeout=5)
+            test_response = requests.get(model["TEST_URL"], timeout=5)
             if test_response.status_code == 200:
                 logger.log("✅ Ollama连接正常", self.ID, "INFO")
 
                 models = test_response.json().get('models', [])
                 model_names = [m['name'] for m in models]
 
-                if model_name in model_names:
-                    logger.log(f"✅ {model_name}模型已加载", self.ID, "INFO")
+                if model["name"] in model_names:
+                    logger.log(f"✅ {model['name']}模型已加载", self.ID, "INFO")
                 else:
-                    logger.log(f"❌ 未找到{model_name}模型", self.ID, "ERROR")
-                    logger.log(f"请运行: ollama pull {model_name}", self.ID, "INFO")
+                    logger.log(f"❌ 未找到{model['name']}模型", self.ID, "ERROR")
+                    logger.log(f"请运行: ollama pull {model['name']}", self.ID, "INFO")
 
                 self.ollama_active = True
             else:
@@ -164,37 +165,47 @@ class RControl:
             logger.log("❌ 无法连接到Ollama", self.ID, "ERROR")
             logger.log("请先启动Ollama服务: ollama serve", self.ID, "INFO")
 
-    def test_connect_openai(self, model_name: str):
+    def test_connect_openai(self, model:dict):
         """测试openai连接"""
         logger.log("正在进行openai的测试链接", self.ID, "INFO")
         try:
-            client = self.model_data[model_name]["client"]
+            client = model["client"]
             temp = client.models.list()
-            for m in temp:
-                if self.model_data[model_name]["model"] == m.id:
-                    logger.log(f"✅ {model_name}模型已加载", self.ID, "INFO")
+
+            model_names = [m.id for m in temp]
+            if model["model"] in model_names:
+                logger.log(f"✅ {model['name']}模型已加载", self.ID, "INFO")
 
             self.openai_active = True  # 只要有模型能通过测试就算能用
 
         except openai.APIConnectionError as e:
             logger.log(f"❌ 连接失败: {e}", self.ID, "ERROR")
             logger.log("请检查 base_url 是否正确，以及网络是否连通。", self.ID, "ERROR")
+            model["active"] = False
+            self.ai_list.remove(model["name"])
         except openai.AuthenticationError as e:
             logger.log(f"❌ 认证失败: {e}", self.ID, "ERROR")
             logger.log("请检查 API Key 是否正确，并且与该 base_url 匹配。", self.ID, "ERROR")
+            model["active"] = False
+            self.ai_list.remove(model["name"])
         except openai.NotFoundError as e:
             # 可能 base_url 路径不对（例如缺少 /v1），或者模型不存在
             logger.log(f"❌ 资源未找到 (404): {e}", self.ID, "ERROR")
             logger.log("请检查 base_url 的格式是否正确（例如是否以 /v1 结尾）。", self.ID, "ERROR")
+            model["active"] = False
+            self.ai_list.remove(model["name"])
         except Exception as e:
             logger.log(f"❌ 发生了其他错误: {e}", self.ID, "ERROR")
+            model["active"] = False
+            self.ai_list.remove(model["name"])
 
     def charge_tag(self, tag: str=""):
         """切换tag"""
         if tag == "":  # 输入为空
             if len(self.ai_list) <= 0:
                 logger.log("当前无可用ai", self.ID, "WARNING")
-            self.tag = self.ai_list[0][0]  # 索引到目标tag
+            if any(name == tag for name, _ in self.ai_list):
+                self.tag = tag
         elif tag in self.ai_list:  # 调用跳转到当前tag
             self.tag = tag
         else:
@@ -213,13 +224,13 @@ class RControl:
         p = path.split(".")
         p = p[-1]
         if p == "json":
-            with open(os.path.join(path), "r") as f:
+            with open(path, "r") as f:
                 data = json.load(f)
             temp = self.__getattribute__(target)  # 为了防止数据丢失，故，先定向后更新
             temp.update(data)
             return True
         elif p == "txt":
-            with open(os.path.join(path), "r") as f:
+            with open(path, "r") as f:
                 data = f.readlines(8192)  # 只读8mb的内容
             self.__setattr__(target, data)
             return True
