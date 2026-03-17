@@ -56,6 +56,13 @@ class Main:
         # 注：一定一定！！！用于cmd控制的函数不要使用参数，不然会造成程序崩溃！！！
         self.exit_active = True
 
+    def init(self):
+        """
+        初始化所有
+        :return:
+        """
+        self.RC.RC_verify()  # 资源校验
+
     def run(self):
         self.receive.start()  # 启动接收线程
         self.work_core.start()

@@ -8,6 +8,8 @@ import os
 
 
 logger = Logger.get_logger()
+AI_TYPE1 = "openai"
+AI_TYPE2 = "ollama"
 
 
 class RControl:
@@ -48,17 +50,16 @@ class RControl:
         self.openai_active = True  # openai接口的链接状态 true表示使用状态
         self.ollama_active = True   # 工具ollama链接状态
         # 设置
-        self.model_data = {}
+        self.model_data = {}  # 储存ai模型
         # 特别标注：openai的实例被放在的目标模型下的client标签中
         self.key_data = {}
-        self.ai_list = []  # 记录可用ai的tag
-        self.tag = "openai"  # 当前使用的ai模型
+        self.tag = AI_TYPE1  # 当前使用的ai模型
         self.key_active = True  # openai需要的API key
         self.ai_active = True  # 确认是否有可运行的ai
 
         self.test_connect_dict = {
-            "openai": self.test_connect_openai,
-            "ollama": self.test_connect_ollama
+            AI_TYPE1: self.test_connect_openai,
+            AI_TYPE2: self.test_connect_ollama
         }
 
     def init_config(self):
@@ -91,7 +92,7 @@ class RControl:
             with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["AI_MODEL"]), "r", encoding="utf-8") as f:
                 data = json.load(f)
             for aim in data:
-                if aim.get("ai_type", "None") == "openai" and self.key_active:
+                if aim.get("ai_type", "None") == AI_TYPE1 and self.key_active:
                     name = aim.get("name", "None")
                     key = self.key_data.get(name, None)
 
@@ -110,13 +111,11 @@ class RControl:
                     )
 
                     aim["active"] = True
-                    self.ai_list.append([aim["name"], "openai"])
-                elif aim["ai_type"] == "ollama":
+                elif aim["ai_type"] == AI_TYPE2:
                     aim["SEND_MESSAGE_URL"] = f"{aim['OLLAMA_HOST']}/api/generate"  # 发送消息的api
                     aim["TEST_URL"] = f"{aim['OLLAMA_HOST']}/api/tags"  # 获取模型列表的api
 
                     aim["active"] = True
-                    self.ai_list.append([aim["name"], "ollama"])
                 else:
                     aim["active"] = False
 
@@ -135,7 +134,8 @@ class RControl:
         """资源校验"""
         self.openai_active = False
         self.ollama_active = False
-        for item in self.ai_list:
+        ai_list = self.get_ai_list()
+        for item in ai_list:
             name = item[0]
             ai_type = item[1]
             self.test_connect_dict.get(ai_type)(self.model_data[name])
@@ -176,43 +176,59 @@ class RControl:
             if model["model"] in model_names:
                 logger.log(f"✅ {model['name']}模型已加载", self.ID, "INFO")
 
-            self.openai_active = True  # 只要有模型能通过测试就算能用
+            self.openai_active = True  # 该类型的ai只要有一个模型能通过测试就算能用
 
         except openai.APIConnectionError as e:
             logger.log(f"❌ 连接失败: {e}", self.ID, "ERROR")
             logger.log("请检查 base_url 是否正确，以及网络是否连通。", self.ID, "ERROR")
             model["active"] = False
-            self.ai_list.remove(model["name"])
         except openai.AuthenticationError as e:
             logger.log(f"❌ 认证失败: {e}", self.ID, "ERROR")
             logger.log("请检查 API Key 是否正确，并且与该 base_url 匹配。", self.ID, "ERROR")
             model["active"] = False
-            self.ai_list.remove(model["name"])
         except openai.NotFoundError as e:
             # 可能 base_url 路径不对（例如缺少 /v1），或者模型不存在
             logger.log(f"❌ 资源未找到 (404): {e}", self.ID, "ERROR")
             logger.log("请检查 base_url 的格式是否正确（例如是否以 /v1 结尾）。", self.ID, "ERROR")
             model["active"] = False
-            self.ai_list.remove(model["name"])
         except Exception as e:
             logger.log(f"❌ 发生了其他错误: {e}", self.ID, "ERROR")
             model["active"] = False
-            self.ai_list.remove(model["name"])
 
     def charge_tag(self, tag: str=""):
         """切换tag"""
+        ai_list = self.get_ai_list()
         if tag == "":  # 输入为空
-            if len(self.ai_list) <= 0:
+            if len(ai_list) <= 0:
                 logger.log("当前无可用ai", self.ID, "WARNING")
-            if any(name == tag for name, _ in self.ai_list):
+            if any(name == tag for name, _ in ai_list):
                 self.tag = tag
-        elif tag in self.ai_list:  # 调用跳转到当前tag
+        elif tag in ai_list:  # 调用跳转到当前tag
             self.tag = tag
         else:
             logger.log(f"无效更改{tag}", self.ID, "WARNING")
             return
 
-    def load(self, path: str, target: str) -> bool | dict:
+    def remove_ai(self, name):
+        if name not in self.model_data.keys():
+            return
+        self.model_data.pop(name)
+
+    def get_ai_list(self) -> list:
+        """
+        获取ai的tag
+        :return:
+        """
+        li = []
+        for k, v in self.model_data.items():
+            if not v["active"]:
+                continue
+            t = [k, v["ai_type"]]
+            li.append(t)
+        return li
+
+
+    def load(self, path: str, target: str) -> dict:
         """
         热加载单元
         :param path: 文件路径（绝对或相对路径）
@@ -228,13 +244,13 @@ class RControl:
                 data = json.load(f)
             temp = self.__getattribute__(target)  # 为了防止数据丢失，故，先定向后更新
             temp.update(data)
-            return True
+            return {"success": True, "data": temp}
         elif p == "txt":
             with open(path, "r") as f:
-                data = f.readlines(8192)  # 只读8mb的内容
+                data = f.read()
             self.__setattr__(target, data)
-            return True
-        return True
+            return {"success": True, "data": data}
+        return {"error": f"未知：{path}"}
 
     def save(self, path: str, s_type: str, target: str):
         """

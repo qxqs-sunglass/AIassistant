@@ -66,7 +66,8 @@ class AIClient:
 
     def send_ollama(self, payload: dict):
         """发送到ollama上
-        标注：需要修改（2026.2.27）"""
+        功能：解码，提取需要的信息
+        标注：需要修改（2026.3.17）"""
         try:
             self.doing_active = True
             response = requests.post(self.RC.SEND_MESSAGE_URL, json=payload, timeout=120)
@@ -76,22 +77,23 @@ class AIClient:
                 msg = msg.replace("\n", "")
                 self.output = msg
                 self.doing_active = False
-                return self.output
+                return
             else:
                 self.doing_active = False
                 logger.log(f"错误: {response.status_code}", self.ID, "ERROR")
-                return None
+                return
         except Exception as e:
             self.doing_active = False
             logger.log(f"请求失败: {e}", self.ID, "ERROR")
-            return None
+            return
 
     def send_openai(self, payload: dict):
         """发送到openai的api上
-        备注：需要完善（2026.2.27）"""
+        备注：需要完善（2026.3.17）"""
 
     def package_ollama(self, message: str | list):
-        """打包ollama消息"""
+        """打包ollama消息
+        备注：需要完善（2026.3.17）"""
         if type(message) is str:
             payload = {
                 "model": self.RC.DEFAULT_MODEL,
@@ -119,7 +121,7 @@ class AIClient:
                 "options": {
                     "temperature": 0.7,
                     "top_p": 0.9,
-                    "num_predict": 512  # Gemma3-1b建议值
+                    "num_predict": 512
                 },
                 "think": False
             }
@@ -130,7 +132,7 @@ class AIClient:
 
     def package_openai(self, message: str | list):
         """用于打包openai的payload
-        备注：需要完善（2026.2.27）"""
+        备注：需要完善（2026.3.17）"""
         payload = {}
         return payload
 
