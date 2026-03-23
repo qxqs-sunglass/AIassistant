@@ -36,16 +36,14 @@ class RControl:
         # 模型参数
         self.TEMPERATURE: float = 0.7
         self.TOP_P: float = 0.9
-        self.NUM_PREDICT: int = 1000
+        self.confidence_threshold: int = 70  # 模型对指令信心度临界值，临界值以下加入人工操作
+        self.tool_choice = "none"  # 使用openai调用模型时是否强制使用tools
 
         # 系统api设置
         self.module_dict = {}  # api实例
-        self.module_intro = []  # api介绍
-
-        # ai第一轮提炼提示 注：相关操作类型必须在mod中标出，指定的位置为:self.intro
-        # 注：第三轮为函数操作，为了方便，所以会在指定的module中制定提示词 名称为：WorkWord
+        # 执行方案
+        self.execute = {}  # 执行方案
         # 联网ai：deepseek、chat-GPT
-        self.tools = []  # 工具，给ai使用
         # 注：这里是负责控制ai_client.py中对ai发送消息的状态变量，是否启用该项发送消息
         self.openai_active = True  # openai接口的链接状态 true表示使用状态
         self.ollama_active = True   # 工具ollama链接状态
@@ -53,7 +51,6 @@ class RControl:
         self.model_data = {}  # 储存ai模型
         # 特别标注：openai的实例被放在的目标模型下的client标签中
         self.key_data = {}
-        self.tag = AI_TYPE1  # 当前使用的ai模型
         self.key_active = True  # openai需要的API key
         self.ai_active = True  # 确认是否有可运行的ai
 
@@ -70,6 +67,7 @@ class RControl:
         logger.log("开始加载配置", self.ID, "INFO")
         logger.log("加载基础配置", self.ID, "INFO")
         # 基础设置
+        logger.info("正在加载基础设置", self.ID)
         try:
             with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["BASIS"]), "r", encoding="utf-8") as f:
                 basis_dict = json.load(f)
@@ -77,15 +75,26 @@ class RControl:
                 setattr(self, key, value)
         except Exception as e:
             logger.log(f"加载基础配置失败，原因：{e}", self.ID, "ERROR")
+        logger.info("基础设置加载完成", self.ID)
 
         # 加载ai_key
+        logger.info("正在尝试读取key文件", self.ID)
         try:
             with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["KEY"]), "r", encoding="utf-8") as f:
                 self.key_data = json.load(f)
             logger.log("已成功加载key.json文件", self.ID, "INFO")
         except Exception as e:
             self.key_active = False
-            logger.log(f"用户未配置key.json，{e}", self.ID, "ERROR")
+            logger.error(f"用户未配置key.json，{e}", self.ID)
+        logger.info("key加载完成", self.ID)
+
+        logger.info("正在加载execute文件", self.ID)
+        try:
+            with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["EXECUTE"]), "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.execute = data["execute"]
+        except Exception as e:
+            logger.error(f"错误信息：{e}", self.ID)
 
         # 加载ai模型设置
         try:
@@ -128,7 +137,6 @@ class RControl:
             n = ins()
             n.init()
             self.module_dict[name] = n  # 动态导入
-            self.module_intro.append(self.module_dict[name].intro)
 
     def RC_verify(self):
         """资源校验"""
@@ -141,22 +149,23 @@ class RControl:
             self.test_connect_dict.get(ai_type)(self.model_data[name])
 
 
-    def test_connect_ollama(self, model: dict):
+    def test_connect_ollama(self, name: str):
         """测试ai连接_ollama"""
         logger.log("测试Ollama连接...", self.ID, "WARNING")
         try:
-            test_response = requests.get(model["TEST_URL"], timeout=5)
+            test_response = requests.get(self.model_data[name]["TEST_URL"], timeout=5)
             if test_response.status_code == 200:
                 logger.log("✅ Ollama连接正常", self.ID, "INFO")
 
                 models = test_response.json().get('models', [])
                 model_names = [m['name'] for m in models]
 
-                if model["name"] in model_names:
-                    logger.log(f"✅ {model['name']}模型已加载", self.ID, "INFO")
+                if self.model_data[name]["model"] in model_names:
+                    logger.log(f"✅ {self.model_data[name]['model']}模型已加载", self.ID, "INFO")
                 else:
-                    logger.log(f"❌ 未找到{model['name']}模型", self.ID, "ERROR")
-                    logger.log(f"请运行: ollama pull {model['name']}", self.ID, "INFO")
+                    logger.log(f"❌ 未找到{self.model_data[name]['model']}模型", self.ID, "WARNING")
+                    logger.log(f"请运行: ollama pull {self.model_data[name]['model']}", self.ID, "INFO")
+                    self.model_data[name]["active"] = False
 
                 self.ollama_active = True
             else:
@@ -165,49 +174,38 @@ class RControl:
             logger.log("❌ 无法连接到Ollama", self.ID, "ERROR")
             logger.log("请先启动Ollama服务: ollama serve", self.ID, "INFO")
 
-    def test_connect_openai(self, model:dict):
+    def test_connect_openai(self, name: str):
         """测试openai连接"""
         logger.log("正在进行openai的测试链接", self.ID, "INFO")
         try:
-            client = model["client"]
+            client = self.model_data[name]["client"]
             temp = client.models.list()
 
             model_names = [m.id for m in temp]
-            if model["model"] in model_names:
-                logger.log(f"✅ {model['name']}模型已加载", self.ID, "INFO")
+            if self.model_data[name]["model"] in model_names:
+                logger.log(f"✅ {self.model_data[name]['model']}模型已加载", self.ID, "INFO")
+            else:
+                logger.log(f"{self.model_data[name]['model']}模型未正确加载", self.ID, "ERROR")
+                self.model_data[name]["active"] = False
 
             self.openai_active = True  # 该类型的ai只要有一个模型能通过测试就算能用
 
         except openai.APIConnectionError as e:
             logger.log(f"❌ 连接失败: {e}", self.ID, "ERROR")
             logger.log("请检查 base_url 是否正确，以及网络是否连通。", self.ID, "ERROR")
-            model["active"] = False
+            self.model_data[name]["active"] = False
         except openai.AuthenticationError as e:
             logger.log(f"❌ 认证失败: {e}", self.ID, "ERROR")
             logger.log("请检查 API Key 是否正确，并且与该 base_url 匹配。", self.ID, "ERROR")
-            model["active"] = False
+            self.model_data[name]["active"] = False
         except openai.NotFoundError as e:
             # 可能 base_url 路径不对（例如缺少 /v1），或者模型不存在
             logger.log(f"❌ 资源未找到 (404): {e}", self.ID, "ERROR")
             logger.log("请检查 base_url 的格式是否正确（例如是否以 /v1 结尾）。", self.ID, "ERROR")
-            model["active"] = False
+            self.model_data[name]["active"] = False
         except Exception as e:
             logger.log(f"❌ 发生了其他错误: {e}", self.ID, "ERROR")
-            model["active"] = False
-
-    def charge_tag(self, tag: str=""):
-        """切换tag"""
-        ai_list = self.get_ai_list()
-        if tag == "":  # 输入为空
-            if len(ai_list) <= 0:
-                logger.log("当前无可用ai", self.ID, "WARNING")
-            if any(name == tag for name, _ in ai_list):
-                self.tag = tag
-        elif tag in ai_list:  # 调用跳转到当前tag
-            self.tag = tag
-        else:
-            logger.log(f"无效更改{tag}", self.ID, "WARNING")
-            return
+            self.model_data[name]["active"] = False
 
     def remove_ai(self, name):
         if name not in self.model_data.keys():

@@ -16,7 +16,10 @@ class AIClient:
         self.master = master
         self.RC = self.master.RC
 
-        self.conversation_history = []
+        self.conversation_history = []  # 会话历史
+        self.now_history_name: str = ""  # 当前会话名称
+        self.now_history: list = []  # 当前回话历史
+        self.len_history: int = 0  # 当前回话的历史长度
         self.doing_active = False
 
         self.output = ""
@@ -30,10 +33,6 @@ class AIClient:
             "ollama": self.send_ollama,
             "openai": self.send_openai
         }
-        self.package_dict = {
-            "ollama": self.package_ollama,
-            "openai": self.package_openai
-        }
 
     def run(self):
         """运行"""
@@ -41,33 +40,19 @@ class AIClient:
     def update(self):
         """更新展示的内容"""
         print("-"*20)
+        print(f"当前会话名称：{self.now_history_name}")
         print(f"当前使用模型：{self.RC.DEFAULT_MODEL}")
-        print(f"当前历史记录长度: {len(self.conversation_history)}")
+        print(f"当前历史记录长度: {self.len_history}")
         if self.doing_active:
             print("AI正在工作...")
         print("聊天内容：" + self.output)
 
-    def send(self, message: str | list):
+    def send_ollama(self, messages: list):
         """
-        指令发送
-        表注：
-        这里发送的str可以直接发送
-        list类型的格式为:[["msg", "role], ["msg", "role"], ...]
-        """
-        if not self.RC.ai_active:  # ai无法使用
-            return {"res": "ERROR"}
-        payload = self.package_dict[self.RC.tag](message)
-        if "error" in payload:  # 错误信息
-            return payload
-        res = self.send_dict[self.RC.tag](payload)
-        logger.log(f"发送指令{message}", self.ID, "INFO")
-        return res
-
-
-    def send_ollama(self, payload: dict):
-        """发送到ollama上
+        发送到ollama上
         功能：解码，提取需要的信息
-        标注：需要修改（2026.3.17）"""
+        """
+        payload = self.package_ollama(messages)
         try:
             self.doing_active = True
             response = requests.post(self.RC.SEND_MESSAGE_URL, json=payload, timeout=120)
@@ -87,54 +72,59 @@ class AIClient:
             logger.log(f"请求失败: {e}", self.ID, "ERROR")
             return
 
-    def send_openai(self, payload: dict):
+    def send_openai(self, model_name: str, messages: list):
         """发送到openai的api上
         备注：需要完善（2026.3.17）"""
+        model = self.RC.model.get(model_name, None)
+        if model is None:
+            return {"error": "无目标模型"}
 
-    def package_ollama(self, message: str | list):
-        """打包ollama消息
-        备注：需要完善（2026.3.17）"""
-        if type(message) is str:
-            payload = {
-                "model": self.RC.DEFAULT_MODEL,
-                "prompt": message,  # 一条信息这里只需要str就行
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "top_p": 0.95,
-                    "num_predict": 512
-                }
-            }
-        elif type(message) is list:
-            data = []
-            for msg in message:
-                data.append(
-                    {
-                        "role": "user",
-                        "content": msg
-                    }
-                )
-            payload = {
-                "model": self.RC.DEFAULT_MODEL,
-                "messages": data,
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "top_p": 0.9,
-                    "num_predict": 512
-                },
-                "think": False
-            }
-        else:
-            logger.log(f"格式错误：{message}", self.ID, "ERROR")
-            return {"error": "ERROR"}
+        client = model.get("client", None)
+        if client is None:
+            return {"error": "当前model无发送客户端"}
+        response = client.chat.completions.create(
+            model=model["model"],
+            messages=messages,
+
+            max_tokens=512,
+            temperature=self.RC.TEMPERATURE,
+            top_p = self.RC.TOP_P,
+            stream = False,
+        )
+
+        data = response.choices
+        self.now_history.append(data[-1])
+
+        return data
+
+    def package_ollama(self, messages: list):
+        """
+        打包ollama消息
+        :param messages: 标准格式：[{}, {}, ···]
+        :return:
+        """
+        payload = {
+            "model": self.RC.DEFAULT_MODEL,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": self.RC.TEMPERATURE,
+                "top_p": self.RC.TOP_P,
+                "num_predict": 512
+            },
+            "think": False
+        }
         return payload
 
-    def package_openai(self, message: str | list):
-        """用于打包openai的payload
-        备注：需要完善（2026.3.17）"""
-        payload = {}
-        return payload
+    def empty_history(self):
+        """
+        清理这一轮的回话历史
+        :return:
+        注：这里需要修改（3.23）
+        """
+        self.now_history = []
+        self.len_history = 0
+        self.doing_active = False
 
     def get_module(self, name):
         """获取指定module的"""

@@ -40,6 +40,12 @@ class WinMedia:
             "volume_up": self.volume_up
         }
         self.temp = ""
+        self.tools = [
+            {
+                "name": "play_pause",
+                "description": "播放媒体"
+            }
+        ]
 
     def init(self):
         """

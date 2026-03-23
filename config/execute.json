@@ -1,0 +1,11 @@
+{
+  "system_prompt": "你的工作是根据用户的对话执行对应的指令",
+  "scheme1": [
+    {
+      "call": {
+        "name": "ai2",
+        "message": "判断语义是否完整，请输出：True/False"
+      }
+    }
+  ]
+}
