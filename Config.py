@@ -9,6 +9,7 @@ PATH_DICT = {
     "BASIS": "basis.json",
     "AI_MODEL": "ai_model.json",
     "KEY": "key.json",
+    "EXECUTE": "execute.json",
 }
 
 

@@ -1,6 +1,8 @@
 import threading
 import re
 import Logger
+import queue
+import copy
 import json
 import time
 
@@ -24,12 +26,13 @@ class WorkCore(threading.Thread):
 
         self.module_dict = self.RC.module_dict  # 存放实例处
         self.module_intro = self.RC.module_intro  # api简介
-
-        temp = self.RC.FIRST_PROMPT_1
-        for m in range(len(self.module_intro)):
-            temp = f"{temp}\n{m+1}.{self.module_intro[m]}"  # 上一句\n下一句
-        self.FIRST_PROMPT = temp + self.RC.FIRST_PROMPT_2
-        logger.log(self.FIRST_PROMPT, self.ID, "INFO")
+        #
+        self.dispose_queue = queue.Queue()
+        self.dispose_temp = []
+        self.dispose_dict = {
+            "call": self.call_ai,
+            "get_model_tools": self.get_module_tools
+        }  # 函数
 
         self.msg_now = "" # 当前消息
         self.mode = "CMD_MODE"  # 模式
@@ -45,7 +48,9 @@ class WorkCore(threading.Thread):
         """
         logger.log("工作核心线程启动", self.ID, "INFO")
         while self.active:
-            self.dispose()
+            data: list = self.SPH.get_msg()
+            if len(data) > 0:  # 收到消息
+                self.dispose()
             time.sleep(self.RC.LOOP_INTERVAL)
 
     def update(self):
@@ -62,9 +67,7 @@ class WorkCore(threading.Thread):
         命令模式处理消息单元
         函数即代表一次处理
         """
-        data: list = self.SPH.get_msg()
-        if len(data) == 0:  # 没有收到消息
-            return
+
 
         self.SPH.reply_send()  # 回复处理完成
 
@@ -145,6 +148,13 @@ class WorkCore(threading.Thread):
         if name not in self.RC.module_dict.keys():
             return {"error": f"不存在的目标{name}"}
         return self.RC.module_dict[name]
+
+    def crate_dispose_scheme(self):
+        """
+        生成指令方案
+        :return:
+        """
+
 
     def reply_test(self, ID):
         """

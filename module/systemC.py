@@ -9,16 +9,7 @@ class SYS_C:
         """
         系统控制类
         """
-        self.intro = "媒体控制：MEDIA_C (控制音乐或其他媒体的：播放/暂停、下一首、上一首)"
-        self.WorkWord = """
-        适用于系统控制的函数：
-        - open_app()  打开指定应用
-        - shutdown_s() 电脑关机
-        - shutdown_r() 电脑重启
-        - shutdown_i() 电脑注销
-        
-        当前记录的应用：
-        """
+        self.intro = "系统控制：SYS_C (控制系统相关操作：关机、重启、锁定、打开应用程序)"
         self.Work_dict = {
             "open_app": self.open_app,
             "open_app()": self.open_app,
@@ -29,7 +20,34 @@ class SYS_C:
             "shutdown_i": self.shutdown_i,
             "shutdown_i()": self.shutdown_i,
         }
-        self.temp = ''
+        self.tools = [
+            {
+                "name": "open_app",
+                "description": "打开应用",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "应用名称，如：'战争雷霆'。",
+                        }
+                    },
+                    "required": ["name"]
+                }
+            },
+            {
+                "name": "shutdown_s",
+                "description": "关闭计算机"
+            },
+            {
+                "name": "shutdown_r",
+                "description": "重启计算机"
+            },
+            {
+                "name": "shutdown_i",
+                "description": "注销账户"
+            }
+        ]
         self.app_dict = {}
         self.shutdown_t = " /t 3"
 
@@ -63,13 +81,13 @@ class SYS_C:
         else:
             self.app_dict = tempdata
 
-    def open_app(self):
+    def open_app(self, name):
         """
         控制应用打开
         :return:
         """
         try:
-            os.startfile(self.temp)
+            os.startfile(self.app_dict[name])
         except Exception:
             return None
 

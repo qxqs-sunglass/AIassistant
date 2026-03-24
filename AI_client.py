@@ -1,6 +1,7 @@
 from openai import OpenAI
 import requests
 import Logger
+import openai
 
 
 logger = Logger.get_logger()
@@ -79,7 +80,7 @@ class AIClient:
         if model is None:
             return {"error": "无目标模型"}
 
-        client = model.get("client", None)
+        client: openai.Client = model.get("client", None)
         if client is None:
             return {"error": "当前model无发送客户端"}
         response = client.chat.completions.create(

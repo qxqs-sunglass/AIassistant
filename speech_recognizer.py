@@ -87,6 +87,8 @@ class SpeechRecognizer:
         :return:
         """
         while self.lis_active:
+            if self.doing_active:
+                time.sleep(0)
             try:
                 with self.microphone as source:
                     self.recognizer.adjust_for_ambient_noise(source, duration=0.5)

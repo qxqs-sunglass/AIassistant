@@ -1,5 +1,7 @@
 from Config import DEFAULT_PATH, PATH_DICT
 from module import API_instance
+from instance.ModelOpenai import ModelOpenai
+from instance.ModelOllama import ModelOllama
 import requests
 import Logger
 import openai
@@ -54,11 +56,6 @@ class RControl:
         self.key_active = True  # openai需要的API key
         self.ai_active = True  # 确认是否有可运行的ai
 
-        self.test_connect_dict = {
-            AI_TYPE1: self.test_connect_openai,
-            AI_TYPE2: self.test_connect_ollama
-        }
-
     def init_config(self):
         """
         注：必须在外部调用此函数
@@ -102,24 +99,9 @@ class RControl:
                 data = json.load(f)
             for aim in data:
                 if aim.get("ai_type", "None") == AI_TYPE1 and self.key_active:
-                    name = aim.get("name", "None")
-                    key = self.key_data.get(name, None)
-
-                    # 初步校验
-                    if name == "None":
-                        aim["active"] = False
-                        continue
-                    if key is None:  # 无效的key
-                        logger.log(f"ai模型：{name}，无效的key", self.ID, "WARNING")
-                        continue
-
-                    aim["key"] = key
-                    aim["client"] = openai.OpenAI(
-                        api_key=key,
-                        base_url=aim["base_url"]
-                    )
-
-                    aim["active"] = True
+                    model = ModelOpenai()
+                    model.init(aim)
+                    self.model_data[model.name] = model
                 elif aim["ai_type"] == AI_TYPE2:
                     aim["SEND_MESSAGE_URL"] = f"{aim['OLLAMA_HOST']}/api/generate"  # 发送消息的api
                     aim["TEST_URL"] = f"{aim['OLLAMA_HOST']}/api/tags"  # 获取模型列表的api
@@ -142,88 +124,14 @@ class RControl:
         """资源校验"""
         self.openai_active = False
         self.ollama_active = False
-        ai_list = self.get_ai_list()
-        for item in ai_list:
-            name = item[0]
-            ai_type = item[1]
-            self.test_connect_dict.get(ai_type)(self.model_data[name])
-
-
-    def test_connect_ollama(self, name: str):
-        """测试ai连接_ollama"""
-        logger.log("测试Ollama连接...", self.ID, "WARNING")
-        try:
-            test_response = requests.get(self.model_data[name]["TEST_URL"], timeout=5)
-            if test_response.status_code == 200:
-                logger.log("✅ Ollama连接正常", self.ID, "INFO")
-
-                models = test_response.json().get('models', [])
-                model_names = [m['name'] for m in models]
-
-                if self.model_data[name]["model"] in model_names:
-                    logger.log(f"✅ {self.model_data[name]['model']}模型已加载", self.ID, "INFO")
-                else:
-                    logger.log(f"❌ 未找到{self.model_data[name]['model']}模型", self.ID, "WARNING")
-                    logger.log(f"请运行: ollama pull {self.model_data[name]['model']}", self.ID, "INFO")
-                    self.model_data[name]["active"] = False
-
-                self.ollama_active = True
-            else:
-                logger.log("❌ Ollama服务异常", self.ID, "ERROR")
-        except:
-            logger.log("❌ 无法连接到Ollama", self.ID, "ERROR")
-            logger.log("请先启动Ollama服务: ollama serve", self.ID, "INFO")
-
-    def test_connect_openai(self, name: str):
-        """测试openai连接"""
-        logger.log("正在进行openai的测试链接", self.ID, "INFO")
-        try:
-            client = self.model_data[name]["client"]
-            temp = client.models.list()
-
-            model_names = [m.id for m in temp]
-            if self.model_data[name]["model"] in model_names:
-                logger.log(f"✅ {self.model_data[name]['model']}模型已加载", self.ID, "INFO")
-            else:
-                logger.log(f"{self.model_data[name]['model']}模型未正确加载", self.ID, "ERROR")
-                self.model_data[name]["active"] = False
-
-            self.openai_active = True  # 该类型的ai只要有一个模型能通过测试就算能用
-
-        except openai.APIConnectionError as e:
-            logger.log(f"❌ 连接失败: {e}", self.ID, "ERROR")
-            logger.log("请检查 base_url 是否正确，以及网络是否连通。", self.ID, "ERROR")
-            self.model_data[name]["active"] = False
-        except openai.AuthenticationError as e:
-            logger.log(f"❌ 认证失败: {e}", self.ID, "ERROR")
-            logger.log("请检查 API Key 是否正确，并且与该 base_url 匹配。", self.ID, "ERROR")
-            self.model_data[name]["active"] = False
-        except openai.NotFoundError as e:
-            # 可能 base_url 路径不对（例如缺少 /v1），或者模型不存在
-            logger.log(f"❌ 资源未找到 (404): {e}", self.ID, "ERROR")
-            logger.log("请检查 base_url 的格式是否正确（例如是否以 /v1 结尾）。", self.ID, "ERROR")
-            self.model_data[name]["active"] = False
-        except Exception as e:
-            logger.log(f"❌ 发生了其他错误: {e}", self.ID, "ERROR")
-            self.model_data[name]["active"] = False
+        for v in self.model_data.values():
+            msgs = v.connect()
+            logger.decoupling(msgs, self.ID)
 
     def remove_ai(self, name):
         if name not in self.model_data.keys():
             return
         self.model_data.pop(name)
-
-    def get_ai_list(self) -> list:
-        """
-        获取ai的tag
-        :return:
-        """
-        li = []
-        for k, v in self.model_data.items():
-            if not v["active"]:
-                continue
-            t = [k, v["ai_type"]]
-            li.append(t)
-        return li
 
 
     def load(self, path: str, target: str) -> dict:
