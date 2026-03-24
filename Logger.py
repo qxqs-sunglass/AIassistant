@@ -21,10 +21,15 @@ class Logger(threading.Thread):
         # 日志级别
         self.LEVELS = {
             "DEBUG": 0,
+            "debug": 0,
             "INFO": 1,
+            "info": 1,
             "WARNING": 2,
+            "warning": 2,
             "ERROR": 3,
-            "CRITICAL": 4
+            "error": 3,
+            "CRITICAL": 4,
+            "critical": 4
         }
         self.min_level = self.LEVELS.get("INFO", 1)  # 默认最低日志级别
         # 注：这里DEBUG与INFO级别的日志消息不会被记录到文件中，仅在控制台输出
@@ -45,6 +50,10 @@ class Logger(threading.Thread):
         # 获取北京时间 (UTC+8)
         beijing_time = datetime.datetime.now()
         return beijing_time.strftime("%Y-%m-%d")
+
+    def get_time(self) -> str:
+        """为了偷懒做的一个获取时间的功能"""
+        return  self._get_beijing_date()
 
     def _check_date_change(self) -> bool:
         """检查日期是否变化，如果变化则返回True并更新"""
@@ -252,6 +261,48 @@ class Logger(threading.Thread):
             print(f"[{self.ID}] 日志队列已满，丢弃消息: {message}")
         except Exception as e:
             print(f"[{self.ID}] 添加日志失败: {e}")
+
+    def info(self, msg: str, log_id: str) -> None:
+        """
+        快捷输出信息
+        :param msg: 消息
+        :param log_id: 目标id
+        :return:
+        """
+        self.log(msg, log_id, level="INFO")
+
+    def warning(self, msg: str, log_id: str) -> None:
+        """
+        快捷输出警告
+        :param msg: 消息
+        :param log_id: 目标id
+        :return:
+        """
+        self.log(msg, log_id, level="WARNING")
+
+    def error(self, msg: str, log_id: str) -> None:
+        """
+        快捷输出报错
+        :param msg: 消息
+        :param log_id: 目标id
+        :return:
+        """
+        self.log(msg, log_id, level="ERROR")
+
+    def decoupling(self, msg: dict|list, log_id: str) -> None:
+        """
+        字典类日志解耦器
+        :param msg: 格式：{'等级': '信息'} or [{}, {}]
+        :param log_id: 目标实例id
+        :return:
+        """
+        if isinstance(msg, list):
+            for msg in msg:
+                self.log(msg, log_id, level="CRITICAL")
+        elif isinstance(msg, dict):
+            for key, value in msg.items():
+                self.log(value, log_id, level=key)
+
 
     def stop(self):
         """停止日志系统"""

@@ -70,7 +70,7 @@ class SpeechRecognizer:
         # 创建并启动监听线程
         listen_thread1 = threading.Thread(target=self.listen, name="ListenThread-001")
         listen_thread1.daemon = True  # 设置为守护线程
-        listen_thread1.start()
+        # listen_thread1.start()
         self.sub_threads.append(listen_thread1)
         print("线程001 - 监听启动")
 
@@ -87,6 +87,8 @@ class SpeechRecognizer:
         :return:
         """
         while self.lis_active:
+            if self.doing_active:
+                time.sleep(0)
             try:
                 with self.microphone as source:
                     self.recognizer.adjust_for_ambient_noise(source, duration=0.5)

@@ -29,7 +29,7 @@ class Main:
         self.receive = Receive(self)  # 创建接收线程对象
 
         # 创建各个模块对象
-        self.ollama_client = AIClient(self)  # Ollama客户端
+        self.ai_client = AIClient(self)  # Ollama客户端
         self.speech_recognizer = SpeechRecognizer(self)  # 语音识别器
         self.tts_engine = TTSEngine(self)  # 语音合成器
         self.work_core = WorkCore(self)  # 工作核心
@@ -39,7 +39,6 @@ class Main:
         self.chat_message = self.speech_recognizer.enter_msg
         self.reply_send = self.speech_recognizer.reply_send
         self.say_text = self.tts_engine.say_text  # 说话
-        self.obtain_msg = self.work_core.obtain_msg  # 获取消息回调函数
         self.enter_msg = self.speech_recognizer.enter_msg  # 输入消息回调函数
 
         self.cmd_queue = queue.Queue()  # 指令队列
@@ -56,13 +55,19 @@ class Main:
         # 注：一定一定！！！用于cmd控制的函数不要使用参数，不然会造成程序崩溃！！！
         self.exit_active = True
 
+    def init(self):
+        """
+        初始化所有
+        :return:
+        """
+        self.RC.RC_verify()  # 资源校验
+
     def run(self):
         self.receive.start()  # 启动接收线程
         self.work_core.start()
         logger.log("启动程序", self.ID, "INFO")
         logger.log("--核心启动--", self.ID, "INFO")
-        self.self_inspection()  # 自检指令
-        self.ollama_client.run()
+        self.ai_client.run()
         self.speech_recognizer.run()
         self.tts_engine.run()
         logger.log("--核心启动完成--", self.ID, "INFO")
@@ -86,7 +91,7 @@ class Main:
     def update(self):
         """"""
         print("程序数据：")
-        self.ollama_client.update()
+        self.ai_client.update()
         self.speech_recognizer.update()
         self.tts_engine.update()
         self.work_core.update()
@@ -100,17 +105,9 @@ class Main:
         print("退出程序...")
         self.exit_active = False
         self.receive.stop()
-        self.ollama_client.stop()
+        self.ai_client.stop()
         self.speech_recognizer.stop()
         self.tts_engine.stop()
-
-    def self_inspection(self):
-        """
-        自检指令
-        :return:
-        """
-        logger.log("启动自检", self.ID, "INFO")
-        self.ollama_client.reply_test(self.ID)
 
     def er(self):
         """cmd指令：输出"""

@@ -13,18 +13,7 @@ class WinMedia:
     VK_VOLUME_UP = 0xAF
 
     def __init__(self):
-        self.intro = "系统控制：SYS_C (控制系统相关操作：关机、重启、锁定、打开应用程序等)"
-        self.WorkWord = """
-            适用于媒体控制的函数：
-            - play_pause()  播放/暂停
-            - next_track()  下一首/换歌/切换歌曲
-            - previous_track()  上一首
-            - volume_mute()  静音
-            - volume_down()  音量减小
-            - volume_up()  音量增加
-            特殊情况：
-            文本中若是提到换歌，或是切换歌曲指的都是next_tract()
-        """
+        self.intro = "媒体控制：MEDIA_C (控制音乐或其他媒体的：播放/暂停、下一首、上一首)"
         self.Work_dict = {
             "play_pause()": self.play_pause,
             "play_pause": self.play_pause,
@@ -40,6 +29,33 @@ class WinMedia:
             "volume_up": self.volume_up
         }
         self.temp = ""
+        self.tools = [
+            {
+                "name": "play_pause",
+                "description": "播放媒体"
+            },
+            {
+                "name": "next_track",
+                "description": "下一首"
+            },
+            {
+                "name": "previous_track",
+                "description": "上一首"
+            },
+            {
+                "name": "volume_mute",
+                "description": "静音"
+            },
+            {
+                "name": "volume_down",
+                "description": "降低音量"
+            },
+            {
+                "name": "volume_up",
+                "description": "提升音量"
+            }
+
+        ]
 
     def init(self):
         """

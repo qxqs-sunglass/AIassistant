@@ -1,6 +1,7 @@
 from openai import OpenAI
 import requests
 import Logger
+import openai
 
 
 logger = Logger.get_logger()
@@ -16,91 +17,43 @@ class AIClient:
         self.master = master
         self.RC = self.master.RC
 
-        self.conversation_history = []
+        self.conversation_history = []  # 会话历史
+        self.now_history_name: str = ""  # 当前会话名称
+        self.now_history: list = []  # 当前回话历史
+        self.len_history: int = 0  # 当前回话的历史长度
         self.doing_active = False
 
         self.output = ""
         self.openai = None
-
-    def run(self):
-        """运行"""
-        # 先测试Ollama连接
-        logger.log("测试Ollama连接...", self.ID, "WARNING")
-        try:
-            test_response = requests.get(self.RC.TEST_RUL, timeout=5)
-            if test_response.status_code == 200:
-                logger.log("✅ Ollama连接正常", self.ID, "INFO")
-
-                models = test_response.json().get('models', [])
-                model_names = [m['name'] for m in models]
-
-                if 'gemma3:1b' in model_names:
-                    logger.log("✅ Gemma3-1b模型已加载", self.ID, "INFO")
-                else:
-                    logger.log("❌ 未找到gemma3:1b模型", self.ID, "ERROR")
-                    logger.log("请运行: ollama pull gemma3:1b", self.ID, "INFO")
-            else:
-                logger.log("❌ Ollama服务异常", self.ID, "ERROR")
-        except:
-            logger.log("❌ 无法连接到Ollama", self.ID, "ERROR")
-            logger.log("请先启动Ollama服务: ollama serve", self.ID, "INFO")
-        try:
+        if self.RC.openai_active:
             self.openai = OpenAI(
                 api_key=self.RC.openai_api,
                 base_url=self.RC.basis_url
             )
-        except:
-            logger.log("❌ 无法连接到openai", self.ID, "ERROR")
+        self.send_dict = {
+            "ollama": self.send_ollama,
+            "openai": self.send_openai
+        }
+
+    def run(self):
+        """运行"""
 
     def update(self):
         """更新展示的内容"""
         print("-"*20)
+        print(f"当前会话名称：{self.now_history_name}")
         print(f"当前使用模型：{self.RC.DEFAULT_MODEL}")
-        print(f"当前历史记录长度: {len(self.conversation_history)}")
+        print(f"当前历史记录长度: {self.len_history}")
         if self.doing_active:
-            print("正在与Ollama聊天...")
+            print("AI正在工作...")
         print("聊天内容：" + self.output)
 
-    def send(self, message: str | list):
+    def send_ollama(self, messages: list):
         """
-        发送消息到ollama
-        适用于指令模式
+        发送到ollama上
+        功能：解码，提取需要的信息
         """
-        if type(message) is str:
-            payload = {
-                "model": self.RC.DEFAULT_MODEL,
-                "prompt": message,  # 一条信息这里只需要str就行
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "top_p": 0.95,
-                    "num_predict": 512
-                }
-            }
-        elif type(message) is list:
-            data = []
-            for msg in message:
-                data.append(
-                    {
-                        "role": "user",
-                        "content": msg
-                    }
-                )
-            payload = {
-                "model": self.RC.DEFAULT_MODEL,
-                "messages": data,
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "top_p": 0.9,
-                    "num_predict": 512  # Gemma3-1b建议值
-                },
-                "think": False
-            }
-        else:
-            logger.log(f"格式错误：{message}", self.ID, "ERROR")
-            return None
-
+        payload = self.package_ollama(messages)
         try:
             self.doing_active = True
             response = requests.post(self.RC.SEND_MESSAGE_URL, json=payload, timeout=120)
@@ -110,15 +63,69 @@ class AIClient:
                 msg = msg.replace("\n", "")
                 self.output = msg
                 self.doing_active = False
-                return self.output
+                return
             else:
                 self.doing_active = False
                 logger.log(f"错误: {response.status_code}", self.ID, "ERROR")
-                return None
+                return
         except Exception as e:
             self.doing_active = False
             logger.log(f"请求失败: {e}", self.ID, "ERROR")
-            return None
+            return
+
+    def send_openai(self, model_name: str, messages: list):
+        """发送到openai的api上
+        备注：需要完善（2026.3.17）"""
+        model = self.RC.model.get(model_name, None)
+        if model is None:
+            return {"error": "无目标模型"}
+
+        client: openai.Client = model.get("client", None)
+        if client is None:
+            return {"error": "当前model无发送客户端"}
+        response = client.chat.completions.create(
+            model=model["model"],
+            messages=messages,
+
+            max_tokens=512,
+            temperature=self.RC.TEMPERATURE,
+            top_p = self.RC.TOP_P,
+            stream = False,
+        )
+
+        data = response.choices
+        self.now_history.append(data[-1])
+
+        return data
+
+    def package_ollama(self, messages: list):
+        """
+        打包ollama消息
+        :param messages: 标准格式：[{}, {}, ···]
+        :return:
+        """
+        payload = {
+            "model": self.RC.DEFAULT_MODEL,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": self.RC.TEMPERATURE,
+                "top_p": self.RC.TOP_P,
+                "num_predict": 512
+            },
+            "think": False
+        }
+        return payload
+
+    def empty_history(self):
+        """
+        清理这一轮的回话历史
+        :return:
+        注：这里需要修改（3.23）
+        """
+        self.now_history = []
+        self.len_history = 0
+        self.doing_active = False
 
     def get_module(self, name):
         """获取指定module的"""
