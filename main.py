@@ -60,7 +60,8 @@ class Main:
         初始化所有
         :return:
         """
-        self.RC.RC_verify()  # 资源校验
+        self.work_core.init()
+        self.RC.verify()  # 资源校验
 
     def run(self):
         self.receive.start()  # 启动接收线程
@@ -87,6 +88,8 @@ class Main:
                 os.system("cls")
                 self.update()
                 time.sleep(self.RC.LOOP_INTERVAL)
+
+        self.init()
 
     def update(self):
         """"""

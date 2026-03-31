@@ -2,7 +2,6 @@ import threading
 import re
 import Logger
 import queue
-import copy
 import json
 import time
 
@@ -31,7 +30,7 @@ class WorkCore(threading.Thread):
         self.dispose_temp = []
         self.dispose_dict = {
             "call": self.call_ai,
-            "get_model_tools": self.get_module_tools
+            "get_model_tools": self.get_module_tools,
         }  # 函数
 
         self.msg_now = "" # 当前消息
@@ -40,6 +39,24 @@ class WorkCore(threading.Thread):
         # 指令模式：CMD_MODE
         # 注：更换模式由AI助手控制
         self.active = True  # 工作核心是否激活
+        self.system_tools = [
+            {
+                "name": "_continue_dispose",
+                "description": "继续执行接下来的指令"
+            },
+            {
+                "name": "_exit_dispose",
+                "description": "终止执行接下来的指令"
+            }
+        ]
+
+    def init(self):
+        """
+        初始化
+        :return:
+        """
+        # 加载方案
+        self._load_dispose_scheme(self.RC.execute_scheme)
 
     def run(self):
         """
@@ -138,6 +155,10 @@ class WorkCore(threading.Thread):
         :param name: 目标模型名称
         :return:
         """
+        res = self.CL.send(name)
+        if "error" in res:
+            logger.error(res["error"], self.ID)
+        return
 
     def get_module_tools(self, name):
         """
@@ -149,17 +170,24 @@ class WorkCore(threading.Thread):
             return {"error": f"不存在的目标{name}"}
         return self.RC.module_dict[name]
 
-    def crate_dispose_scheme(self):
+    def _load_dispose_scheme(self, scheme):
+        # 导入使用方案
+        disposes = self.RC.execute.get(scheme)
+        for dispose in disposes:
+            self.dispose_queue.put(dispose)
+
+    def _continue_dispose(self):
         """
-        生成指令方案
+        继续指令操作
         :return:
         """
+        command = self.dispose_queue.get_nowait()
 
 
-    def reply_test(self, ID):
+    def _exit_dispose(self):
         """
-        响应自检
+        终止目前的操作，返回最初状态
         :return:
         """
-        logger.log(f"{self.ID}, 自检响应成功", ID, "INFO")
-        return True
+        self._load_dispose_scheme(self.RC.execute_scheme)
+

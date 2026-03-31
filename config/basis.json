@@ -12,5 +12,6 @@
   "TEMPERATURE": 0.7,
   "TOP_P": 0.95,
   "confidence_threshold": 70,
-  "tool_choice": "required"
+  "tool_choice": "required",
+  "execute_scheme": "scheme1"
 }

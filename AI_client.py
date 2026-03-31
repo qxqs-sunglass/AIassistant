@@ -48,7 +48,18 @@ class AIClient:
             print("AI正在工作...")
         print("聊天内容：" + self.output)
 
-    def send_ollama(self, messages: list):
+    def send(self, name):
+        """
+        发送到目标ai端
+        :param name:
+        :return:
+        """
+        inst = self.send_dict.get(name)
+        if inst is None:
+            return {"ERROR": "名称错误"}
+        return inst()
+
+    def send_ollama(self, messages: list) -> dict:
         """
         发送到ollama上
         功能：解码，提取需要的信息
@@ -63,15 +74,15 @@ class AIClient:
                 msg = msg.replace("\n", "")
                 self.output = msg
                 self.doing_active = False
-                return
+                return {}
             else:
                 self.doing_active = False
                 logger.log(f"错误: {response.status_code}", self.ID, "ERROR")
-                return
+                return {}
         except Exception as e:
             self.doing_active = False
             logger.log(f"请求失败: {e}", self.ID, "ERROR")
-            return
+            return {}
 
     def send_openai(self, model_name: str, messages: list):
         """发送到openai的api上
@@ -137,11 +148,3 @@ class AIClient:
         """停止"""
         self.doing_active = False
         print("已停止与Ollama的对话...")
-
-    def reply_test(self, ID):
-        """
-        响应自检
-        :return:
-        """
-        logger.log(f"{self.ID}, 自检响应成功", ID, "INFO")
-        return True

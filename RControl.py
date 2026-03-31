@@ -1,10 +1,8 @@
 from Config import DEFAULT_PATH, PATH_DICT
-from module import API_instance
 from instance.ModelOpenai import ModelOpenai
 from instance.ModelOllama import ModelOllama
-import requests
+from module import API_instance
 import Logger
-import openai
 import json
 import os
 
@@ -44,7 +42,8 @@ class RControl:
         # 系统api设置
         self.module_dict = {}  # api实例
         # 执行方案
-        self.execute = {}  # 执行方案
+        self.execute_dict = {}  # 执行方案：[名称] -> {}(方案内容)
+        self.execute_scheme = "scheme1"  # 方案名称
         # 联网ai：deepseek、chat-GPT
         # 注：这里是负责控制ai_client.py中对ai发送消息的状态变量，是否启用该项发送消息
         self.openai_active = True  # openai接口的链接状态 true表示使用状态
@@ -89,7 +88,7 @@ class RControl:
         try:
             with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["EXECUTE"]), "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self.execute = data["execute"]
+            self.execute_dict = data["execute"]
         except Exception as e:
             logger.error(f"错误信息：{e}", self.ID)
 
@@ -103,12 +102,11 @@ class RControl:
                     model.init(aim)
                     self.model_data[model.name] = model
                 elif aim["ai_type"] == AI_TYPE2:
-                    aim["SEND_MESSAGE_URL"] = f"{aim['OLLAMA_HOST']}/api/generate"  # 发送消息的api
-                    aim["TEST_URL"] = f"{aim['OLLAMA_HOST']}/api/tags"  # 获取模型列表的api
-
-                    aim["active"] = True
+                    model = ModelOllama()
+                    model.init(aim)
+                    self.model_data[model.name] = model
                 else:
-                    aim["active"] = False
+                    logger.warning("未知类型的ai源", self.ID)
 
                 self.model_data[aim["name"]] = aim  #  保存数据
         except Exception as e:
@@ -120,12 +118,18 @@ class RControl:
             n.init()
             self.module_dict[name] = n  # 动态导入
 
-    def RC_verify(self):
+    def verify(self):
         """资源校验"""
-        self.openai_active = False
-        self.ollama_active = False
+        self.openai_active = True
+        self.ollama_active = True
         for v in self.model_data.values():
+            v: ModelOpenai|ModelOllama
             msgs = v.connect()
+            if "error" in msgs or "ERROR" in msgs:
+                if v.ai_type == AI_TYPE1:
+                    self.ollama_active = False
+                else:
+                    self.openai_active = False
             logger.decoupling(msgs, self.ID)
 
     def remove_ai(self, name):
@@ -136,7 +140,7 @@ class RControl:
 
     def load(self, path: str, target: str) -> dict:
         """
-        热加载单元
+        热加载单元，只读取.json文件，其他文件不予读取
         :param path: 文件路径（绝对或相对路径）
         :param target: 保存数据的地址（变量名）
         :return:
@@ -151,16 +155,11 @@ class RControl:
             temp = self.__getattribute__(target)  # 为了防止数据丢失，故，先定向后更新
             temp.update(data)
             return {"success": True, "data": temp}
-        elif p == "txt":
-            with open(path, "r") as f:
-                data = f.read()
-            self.__setattr__(target, data)
-            return {"success": True, "data": data}
         return {"error": f"未知：{path}"}
 
     def save(self, path: str, s_type: str, target: str):
         """
-        保存文件
+        保存文件，只保存.json文件
         :param path: 文件路径
         :param s_type: 保存类型
         :param target: 目标数值
@@ -171,19 +170,16 @@ class RControl:
                 with open(os.path.join(path), "w") as f:
                     json.dump(self.__getattribute__(target), f, indent=2)
                 return True
-            if s_type == "txt":
-                with open(os.path.join(path), "w") as f:
-                    f.write(self.__getattribute__(target))
-                return True
         except Exception as e:
             return {"error": f"错误：{e}"}
         return {"error": f"类型错误{path}"}
 
-    def reply_test(self, ID):
+    def charge_scheme(self, scheme):
         """
-        响应自检
+        切换方案
+        :param scheme: 方案名称
         :return:
         """
-        logger.log(f"{self.ID}, 自检响应成功", ID, "INFO")
-        return True
-
+        if scheme not in self.execute_dict.keys():
+            logger.error(f"目标不存在{scheme}", self.ID)
+        self.execute_scheme = scheme
