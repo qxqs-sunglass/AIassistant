@@ -1,7 +1,6 @@
 import threading
 import re
 import Logger
-import queue
 import json
 import time
 
@@ -26,8 +25,6 @@ class WorkCore(threading.Thread):
         self.module_dict = self.RC.module_dict  # 存放实例处
         self.module_intro = self.RC.module_intro  # api简介
         #
-        self.dispose_queue = queue.Queue()
-        self.dispose_temp = []
         self.dispose_dict = {
             "call": self.call_ai,
             "get_model_tools": self.get_module_tools,
@@ -39,24 +36,12 @@ class WorkCore(threading.Thread):
         # 指令模式：CMD_MODE
         # 注：更换模式由AI助手控制
         self.active = True  # 工作核心是否激活
-        self.system_tools = [
-            {
-                "name": "_continue_dispose",
-                "description": "继续执行接下来的指令"
-            },
-            {
-                "name": "_exit_dispose",
-                "description": "终止执行接下来的指令"
-            }
-        ]
 
     def init(self):
         """
         初始化
         :return:
         """
-        # 加载方案
-        self._load_dispose_scheme(self.RC.execute_scheme)
 
     def run(self):
         """
@@ -67,7 +52,7 @@ class WorkCore(threading.Thread):
         while self.active:
             data: list = self.SPH.get_msg()
             if len(data) > 0:  # 收到消息
-                self.dispose()
+                self.dispose(data)
             time.sleep(self.RC.LOOP_INTERVAL)
 
     def update(self):
@@ -79,12 +64,18 @@ class WorkCore(threading.Thread):
         print(f"当前模式{self.mode}")
         print(f"当前处理：{self.msg_now}")
 
-    def dispose(self):
+    def dispose(self, msg):
         """
         命令模式处理消息单元
         函数即代表一次处理
+        :param msg:  用户消息
         """
-
+        scheme = self.RC.scheme
+        ai_module = self.module_dict.get(scheme)
+        if not ai_module:  # 目标错误
+            logger.error("无目标ai", self.ID)
+            return
+        self.CL.send(msg)
 
         self.SPH.reply_send()  # 回复处理完成
 
@@ -169,25 +160,4 @@ class WorkCore(threading.Thread):
         if name not in self.RC.module_dict.keys():
             return {"error": f"不存在的目标{name}"}
         return self.RC.module_dict[name]
-
-    def _load_dispose_scheme(self, scheme):
-        # 导入使用方案
-        disposes = self.RC.execute.get(scheme)
-        for dispose in disposes:
-            self.dispose_queue.put(dispose)
-
-    def _continue_dispose(self):
-        """
-        继续指令操作
-        :return:
-        """
-        command = self.dispose_queue.get_nowait()
-
-
-    def _exit_dispose(self):
-        """
-        终止目前的操作，返回最初状态
-        :return:
-        """
-        self._load_dispose_scheme(self.RC.execute_scheme)
 

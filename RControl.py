@@ -38,15 +38,15 @@ class RControl:
         self.TOP_P: float = 0.9
         self.confidence_threshold: int = 70  # 模型对指令信心度临界值，临界值以下加入人工操作
         self.tool_choice = "none"  # 使用openai调用模型时是否强制使用tools
+        self.scheme = ""
+        self.using_token = {}  # 各类token用量统计
 
         # 系统api设置
         self.module_dict = {}  # api实例
-        # 执行方案
-        self.execute_dict = {}  # 执行方案：[名称] -> {}(方案内容)
-        self.execute_scheme = "scheme1"  # 方案名称
+        self.load_list = []
         # 联网ai：deepseek、chat-GPT
         # 注：这里是负责控制ai_client.py中对ai发送消息的状态变量，是否启用该项发送消息
-        self.openai_active = True  # openai接口的链接状态 true表示使用状态
+        self.openai_active = True  # openai接口的链接状态 true表示可以使用状态
         self.ollama_active = True   # 工具ollama链接状态
         # 设置
         self.model_data = {}  # 储存ai模型
@@ -84,14 +84,6 @@ class RControl:
             logger.error(f"用户未配置key.json，{e}", self.ID)
         logger.info("key加载完成", self.ID)
 
-        logger.info("正在加载execute文件", self.ID)
-        try:
-            with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["EXECUTE"]), "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.execute_dict = data["execute"]
-        except Exception as e:
-            logger.error(f"错误信息：{e}", self.ID)
-
         # 加载ai模型设置
         try:
             with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["AI_MODEL"]), "r", encoding="utf-8") as f:
@@ -117,6 +109,12 @@ class RControl:
             n = ins()
             n.init()
             self.module_dict[name] = n  # 动态导入
+
+        if len(self.load_list) > 0:  # 导入额外数据，注：必须确保文件名和变量值一样
+           for attr in self.load_list:
+               name = os.path.split(attr)[-1]
+               name = name.rsplit(".", 1)[0]
+               self.load(attr, name)
 
     def verify(self):
         """资源校验"""
@@ -157,29 +155,16 @@ class RControl:
             return {"success": True, "data": temp}
         return {"error": f"未知：{path}"}
 
-    def save(self, path: str, s_type: str, target: str):
+    def save(self, path: str, target: str):
         """
         保存文件，只保存.json文件
         :param path: 文件路径
-        :param s_type: 保存类型
         :param target: 目标数值
         :return:
         """
         try:
-            if s_type == "json":
-                with open(os.path.join(path), "w") as f:
-                    json.dump(self.__getattribute__(target), f, indent=2)
-                return True
+            with open(os.path.join(path), "w") as f:
+                json.dump(self.__getattribute__(target), f, indent=2)
+            return True
         except Exception as e:
             return {"error": f"错误：{e}"}
-        return {"error": f"类型错误{path}"}
-
-    def charge_scheme(self, scheme):
-        """
-        切换方案
-        :param scheme: 方案名称
-        :return:
-        """
-        if scheme not in self.execute_dict.keys():
-            logger.error(f"目标不存在{scheme}", self.ID)
-        self.execute_scheme = scheme

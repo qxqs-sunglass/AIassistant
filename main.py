@@ -1,6 +1,7 @@
 from RControl import RControl
 from AI_client import AIClient
 from speech_recognizer import SpeechRecognizer
+from teleprompter import TelePrompter
 from tts_engine import TTSEngine
 from WorkCore import WorkCore
 import Logger
@@ -33,6 +34,7 @@ class Main:
         self.speech_recognizer = SpeechRecognizer(self)  # 语音识别器
         self.tts_engine = TTSEngine(self)  # 语音合成器
         self.work_core = WorkCore(self)  # 工作核心
+        self.teleprompter = TelePrompter(self)
 
         # 基础数据 回调函数
         self.send_message = self.speech_recognizer.enter_msg
@@ -61,6 +63,7 @@ class Main:
         :return:
         """
         self.work_core.init()
+        self.teleprompter.init()
         self.RC.verify()  # 资源校验
 
     def run(self):
