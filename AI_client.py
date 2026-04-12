@@ -2,6 +2,7 @@ from openai import OpenAI
 import requests
 import Logger
 import openai
+import copy
 
 
 logger = Logger.get_logger()
@@ -16,11 +17,13 @@ class AIClient:
         self.ID = "AIClient"
         self.master = master
         self.RC = self.master.RC
+        self.TP = self.master.teleprompter
 
         self.conversation_history = []  # 会话历史
         self.now_history_name: str = ""  # 当前会话名称
         self.now_history: list = []  # 当前回话历史
         self.len_history: int = 0  # 当前回话的历史长度
+        self.using_token: dict = self.RC.using_token  # 各类token用量
         self.doing_active = False
 
         self.output = ""
@@ -48,12 +51,23 @@ class AIClient:
             print("AI正在工作...")
         print("聊天内容：" + self.output)
 
-    def send_ollama(self, messages: list):
+    def send(self, msg):
+        """
+        发送到目标ai端
+        :param msg:
+        :return:
+        """
+        inst = self.send_dict.get(self.RC.scheme)
+        if inst is None:
+            return {"ERROR": "名称错误"}
+        return inst(msg)
+
+    def send_ollama(self, message: str) -> dict:
         """
         发送到ollama上
         功能：解码，提取需要的信息
         """
-        payload = self.package_ollama(messages)
+        payload = self.package_ollama(message)
         try:
             self.doing_active = True
             response = requests.post(self.RC.SEND_MESSAGE_URL, json=payload, timeout=120)
@@ -63,30 +77,30 @@ class AIClient:
                 msg = msg.replace("\n", "")
                 self.output = msg
                 self.doing_active = False
-                return
+                return {}
             else:
                 self.doing_active = False
                 logger.log(f"错误: {response.status_code}", self.ID, "ERROR")
-                return
+                return {}
         except Exception as e:
             self.doing_active = False
             logger.log(f"请求失败: {e}", self.ID, "ERROR")
-            return
+            return {}
 
-    def send_openai(self, model_name: str, messages: list):
+    def send_openai(self, model_name: str, message: str):
         """发送到openai的api上
         备注：需要完善（2026.3.17）"""
-        model = self.RC.model.get(model_name, None)
+        model = self.RC.model_data.get(model_name, None)
         if model is None:
             return {"error": "无目标模型"}
+        data = self.package_openai(message)
 
-        client: openai.Client = model.get("client", None)
+        client: openai.Client = model.get("client")
         if client is None:
             return {"error": "当前model无发送客户端"}
         response = client.chat.completions.create(
             model=model["model"],
-            messages=messages,
-
+            messages=data,
             max_tokens=512,
             temperature=self.RC.TEMPERATURE,
             top_p = self.RC.TOP_P,
@@ -94,19 +108,32 @@ class AIClient:
         )
 
         data = response.choices
+        token = response.usage
+        for k, v in token.items():  # 计算token
+            if k not in self.using_token:
+                logger.warning(f"无法保存的键值：{k}：{v}", self.ID)
+                continue
+            self.using_token[k] += v
+        self.RC.save("config/using_token.json", "using_token")
         self.now_history.append(data[-1])
 
         return data
 
-    def package_ollama(self, messages: list):
+    def package_ollama(self, message: str):
         """
         打包ollama消息
-        :param messages: 标准格式：[{}, {}, ···]
+        :param message:
         :return:
         """
+        self.now_history.append(
+            {
+                "content": message,
+                "role": "user"
+            }
+        )
         payload = {
             "model": self.RC.DEFAULT_MODEL,
-            "messages": messages,
+            "messages": self.now_history,
             "stream": False,
             "options": {
                 "temperature": self.RC.TEMPERATURE,
@@ -115,6 +142,21 @@ class AIClient:
             },
             "think": False
         }
+        return payload
+
+    def package_openai(self, messages: str):
+        """
+        打包openai
+        :param messages:
+        :return:
+        """
+        self.now_history.append(
+            {
+                "content": messages,
+                "role": "user"
+            }
+        )
+        payload = copy.copy(self.now_history)
         return payload
 
     def empty_history(self):
@@ -137,11 +179,3 @@ class AIClient:
         """停止"""
         self.doing_active = False
         print("已停止与Ollama的对话...")
-
-    def reply_test(self, ID):
-        """
-        响应自检
-        :return:
-        """
-        logger.log(f"{self.ID}, 自检响应成功", ID, "INFO")
-        return True

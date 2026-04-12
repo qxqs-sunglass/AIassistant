@@ -1,8 +1,6 @@
 import threading
 import re
 import Logger
-import queue
-import copy
 import json
 import time
 
@@ -27,11 +25,9 @@ class WorkCore(threading.Thread):
         self.module_dict = self.RC.module_dict  # 存放实例处
         self.module_intro = self.RC.module_intro  # api简介
         #
-        self.dispose_queue = queue.Queue()
-        self.dispose_temp = []
         self.dispose_dict = {
             "call": self.call_ai,
-            "get_model_tools": self.get_module_tools
+            "get_model_tools": self.get_module_tools,
         }  # 函数
 
         self.msg_now = "" # 当前消息
@@ -40,6 +36,12 @@ class WorkCore(threading.Thread):
         # 指令模式：CMD_MODE
         # 注：更换模式由AI助手控制
         self.active = True  # 工作核心是否激活
+
+    def init(self):
+        """
+        初始化
+        :return:
+        """
 
     def run(self):
         """
@@ -50,7 +52,7 @@ class WorkCore(threading.Thread):
         while self.active:
             data: list = self.SPH.get_msg()
             if len(data) > 0:  # 收到消息
-                self.dispose()
+                self.dispose(data)
             time.sleep(self.RC.LOOP_INTERVAL)
 
     def update(self):
@@ -62,12 +64,18 @@ class WorkCore(threading.Thread):
         print(f"当前模式{self.mode}")
         print(f"当前处理：{self.msg_now}")
 
-    def dispose(self):
+    def dispose(self, msg):
         """
         命令模式处理消息单元
         函数即代表一次处理
+        :param msg:  用户消息
         """
-
+        scheme = self.RC.scheme
+        ai_module = self.module_dict.get(scheme)
+        if not ai_module:  # 目标错误
+            logger.error("无目标ai", self.ID)
+            return
+        self.CL.send(msg)
 
         self.SPH.reply_send()  # 回复处理完成
 
@@ -138,6 +146,10 @@ class WorkCore(threading.Thread):
         :param name: 目标模型名称
         :return:
         """
+        res = self.CL.send(name)
+        if "error" in res:
+            logger.error(res["error"], self.ID)
+        return
 
     def get_module_tools(self, name):
         """
@@ -149,17 +161,3 @@ class WorkCore(threading.Thread):
             return {"error": f"不存在的目标{name}"}
         return self.RC.module_dict[name]
 
-    def crate_dispose_scheme(self):
-        """
-        生成指令方案
-        :return:
-        """
-
-
-    def reply_test(self, ID):
-        """
-        响应自检
-        :return:
-        """
-        logger.log(f"{self.ID}, 自检响应成功", ID, "INFO")
-        return True

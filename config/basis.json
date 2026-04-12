@@ -1,7 +1,7 @@
 {
   "__version__": "0.1.0：demo version",
   "__author__": "@bilibili_秋天会有下雪天",
-  "AI_NAME": "小平同学",
+  "AI_NAME": "小平",
   "LOOP_INTERVAL": 0.3,
   "SPEECH_LANGUAGE": "zh-CN",
   "VOICE_RATE": 160,
@@ -12,5 +12,7 @@
   "TEMPERATURE": 0.7,
   "TOP_P": 0.95,
   "confidence_threshold": 70,
-  "tool_choice": "required"
+  "tool_choice": "required",
+  "scheme": "DeepSeek",
+  "load_list": ["/config/using_token"]
 }

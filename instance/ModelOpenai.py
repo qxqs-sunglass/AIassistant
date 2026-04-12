@@ -70,3 +70,14 @@ class ModelOpenai:
         if key in self.blacklist:
             return
         self.__dict__[key] = value
+
+    def get(self, key: str) -> object:
+        """
+        获取
+        :param key:
+        :return:
+        """
+        if key not in self.__dict__:
+            return None
+        attr = self.__getattribute__(key)
+        return attr
