@@ -9,7 +9,7 @@ class SYS_C:
         """
         系统控制类
         """
-        self.intro = "系统控制：SYS_C (控制系统相关操作：关机、重启、锁定、打开应用程序)"
+        self.intro = "SYS_C：负责系统控制，相关操作：关机、重启、锁定、打开应用程序"
         self.Work_dict = {
             "open_app": self.open_app,
             "open_app()": self.open_app,

@@ -1,6 +1,5 @@
 from Config import DEFAULT_PATH, PATH_DICT
-from instance.ModelOpenai import ModelOpenai
-from instance.ModelOllama import ModelOllama
+from instance.AIModel import AIModel
 from module import API_instance
 import Logger
 import json
@@ -47,10 +46,10 @@ class RControl:
         # 联网ai：deepseek、chat-GPT
         # 注：这里是负责控制ai_client.py中对ai发送消息的状态变量，是否启用该项发送消息
         self.openai_active = True  # openai接口的链接状态 true表示可以使用状态
-        self.ollama_active = True   # 工具ollama链接状态
         # 设置
         self.model_data = {}  # 储存ai模型
         # 特别标注：openai的实例被放在的目标模型下的client标签中
+        self.tools = {}  # 系统工具
         self.key_data = {}
         self.key_active = True  # openai需要的API key
         self.ai_active = True  # 确认是否有可运行的ai
@@ -89,25 +88,18 @@ class RControl:
             with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["AI_MODEL"]), "r", encoding="utf-8") as f:
                 data = json.load(f)
             for aim in data:
-                if aim.get("ai_type", "None") == AI_TYPE1 and self.key_active:
-                    model = ModelOpenai()
-                    model.init(aim)
-                    self.model_data[model.name] = model
-                elif aim["ai_type"] == AI_TYPE2:
-                    model = ModelOllama()
-                    model.init(aim)
-                    self.model_data[model.name] = model
-                else:
-                    logger.warning("未知类型的ai源", self.ID)
-
-                self.model_data[aim["name"]] = aim  #  保存数据
+                model = AIModel()
+                model.init(aim)
+                self.model_data[model.name] = model
         except Exception as e:
             logger.log(f"用户未正确配置ai_model.json，{e}", self.ID, "ERROR")
         logger.log("加载基础配置完成", self.ID, "INFO")
         # 导入api
+        intros = {}
         for name, ins in API_instance.items():
             n = ins()
             n.init()
+            intro = n.intro
             self.module_dict[name] = n  # 动态导入
 
         if len(self.load_list) > 0:  # 导入额外数据，注：必须确保文件名和变量值一样
@@ -118,16 +110,12 @@ class RControl:
 
     def verify(self):
         """资源校验"""
-        self.openai_active = True
-        self.ollama_active = True
+        self.openai_active = False
         for v in self.model_data.values():
-            v: ModelOpenai|ModelOllama
+            v: AIModel
             msgs = v.connect()
-            if "error" in msgs or "ERROR" in msgs:
-                if v.ai_type == AI_TYPE1:
-                    self.ollama_active = False
-                else:
-                    self.openai_active = False
+            if "error" not in msgs or "ERROR" not in msgs:
+                self.openai_active = True
             logger.decoupling(msgs, self.ID)
 
     def remove_ai(self, name):

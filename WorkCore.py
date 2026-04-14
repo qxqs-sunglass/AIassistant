@@ -52,7 +52,10 @@ class WorkCore(threading.Thread):
         while self.active:
             data: list = self.SPH.get_msg()
             if len(data) > 0:  # 收到消息
-                self.dispose(data)
+                msg = data[0]
+                self.dispose(msg)
+                data.pop(0)  # 抛出第一项
+            self.SPH.reply_send()  # 回复处理完成
             time.sleep(self.RC.LOOP_INTERVAL)
 
     def update(self):
@@ -75,9 +78,11 @@ class WorkCore(threading.Thread):
         if not ai_module:  # 目标错误
             logger.error("无目标ai", self.ID)
             return
-        self.CL.send(msg)
 
-        self.SPH.reply_send()  # 回复处理完成
+        if self.mode == "CMD_MODE":
+            self._handle_cmd_mode(msg, scheme)
+        elif self.mode == "CMD_CHAT_MODE":
+            self._handle_chat_mode(msg, scheme)
 
     def analysis_json(self, msg: str) -> dict:
         """
@@ -160,4 +165,20 @@ class WorkCore(threading.Thread):
         if name not in self.RC.module_dict.keys():
             return {"error": f"不存在的目标{name}"}
         return self.RC.module_dict[name]
+
+    def _handle_cmd_mode(self, user_msg, scheme, tools_name):
+        """
+        使用cmd方式发送
+        :param user_msg: 用户消息
+        :param scheme: 执行方案（ai名）
+        :param tools_name: 目标工具包名
+        :return:
+        """
+
+    def _handle_chat_mode(self, user_msg, scheme, tools_name):
+        """
+        聊天模式
+        :param user_msg:
+        :return:
+        """
 

@@ -1,7 +1,7 @@
 import openai
 
 
-class ModelOpenai:
+class AIModel:
     def __init__(self):
         """
         适用于存储openai的数据

@@ -17,7 +17,6 @@ class AIClient:
         self.ID = "AIClient"
         self.master = master
         self.RC = self.master.RC
-        self.TP = self.master.teleprompter
 
         self.conversation_history = []  # 会话历史
         self.now_history_name: str = ""  # 当前会话名称
@@ -62,45 +61,21 @@ class AIClient:
             return {"ERROR": "名称错误"}
         return inst(msg)
 
-    def send_ollama(self, message: str) -> dict:
-        """
-        发送到ollama上
-        功能：解码，提取需要的信息
-        """
-        payload = self.package_ollama(message)
-        try:
-            self.doing_active = True
-            response = requests.post(self.RC.SEND_MESSAGE_URL, json=payload, timeout=120)
-            if response.status_code == 200:
-                result = response.json()
-                msg: str = result.get("response", "")
-                msg = msg.replace("\n", "")
-                self.output = msg
-                self.doing_active = False
-                return {}
-            else:
-                self.doing_active = False
-                logger.log(f"错误: {response.status_code}", self.ID, "ERROR")
-                return {}
-        except Exception as e:
-            self.doing_active = False
-            logger.log(f"请求失败: {e}", self.ID, "ERROR")
-            return {}
-
-    def send_openai(self, model_name: str, message: str):
+    def send_openai(self, model_name: str, message: str, tools_name: str):
         """发送到openai的api上
         备注：需要完善（2026.3.17）"""
         model = self.RC.model_data.get(model_name, None)
         if model is None:
             return {"error": "无目标模型"}
-        data = self.package_openai(message)
+        data_msgs = self.package_openai(message)
+        data_tools = self.get_module_tool(tools_name)
 
         client: openai.Client = model.get("client")
         if client is None:
             return {"error": "当前model无发送客户端"}
         response = client.chat.completions.create(
             model=model["model"],
-            messages=data,
+            messages=data_msgs,
             max_tokens=512,
             temperature=self.RC.TEMPERATURE,
             top_p = self.RC.TOP_P,
@@ -119,34 +94,9 @@ class AIClient:
 
         return data
 
-    def package_ollama(self, message: str):
-        """
-        打包ollama消息
-        :param message:
-        :return:
-        """
-        self.now_history.append(
-            {
-                "content": message,
-                "role": "user"
-            }
-        )
-        payload = {
-            "model": self.RC.DEFAULT_MODEL,
-            "messages": self.now_history,
-            "stream": False,
-            "options": {
-                "temperature": self.RC.TEMPERATURE,
-                "top_p": self.RC.TOP_P,
-                "num_predict": 512
-            },
-            "think": False
-        }
-        return payload
-
     def package_openai(self, messages: str):
         """
-        打包openai
+        打包openai的消息键值
         :param messages:
         :return:
         """
@@ -174,6 +124,11 @@ class AIClient:
         if name not in self.RC.module_dict.keys():
             return {"res": "ERROR"}
         return self.RC.module_dict[name]
+
+    def get_module_tool(self, name):
+        if name not in self.RC.module_dict:
+            return {"res": "ERROR"}
+        return self.RC.module_dict[name].tools
 
     def stop(self):
         """停止"""

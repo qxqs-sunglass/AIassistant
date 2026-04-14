@@ -13,7 +13,7 @@ class WinMedia:
     VK_VOLUME_UP = 0xAF
 
     def __init__(self):
-        self.intro = "媒体控制：MEDIA_C (控制音乐或其他媒体的：播放/暂停、下一首、上一首)"
+        self.intro = "MEDIA_C：负责计算机的媒体控制，具体为控制音乐或其他媒体的：播放/暂停、下一首、上一首"
         self.Work_dict = {
             "play_pause()": self.play_pause,
             "play_pause": self.play_pause,
