@@ -32,10 +32,6 @@ class AIClient:
                 api_key=self.RC.openai_api,
                 base_url=self.RC.basis_url
             )
-        self.send_dict = {
-            "ollama": self.send_ollama,
-            "openai": self.send_openai
-        }
 
     def run(self):
         """运行"""
@@ -50,20 +46,8 @@ class AIClient:
             print("AI正在工作...")
         print("聊天内容：" + self.output)
 
-    def send(self, msg):
-        """
-        发送到目标ai端
-        :param msg:
-        :return:
-        """
-        inst = self.send_dict.get(self.RC.scheme)
-        if inst is None:
-            return {"ERROR": "名称错误"}
-        return inst(msg)
-
-    def send_openai(self, model_name: str, message: str, tools_name: str):
-        """发送到openai的api上
-        备注：需要完善（2026.3.17）"""
+    def send(self, model_name: str, message: str, tools_name: str):
+        """发送到openai的api上"""
         model = self.RC.model_data.get(model_name, None)
         if model is None:
             return {"error": "无目标模型"}
@@ -80,11 +64,12 @@ class AIClient:
             temperature=self.RC.TEMPERATURE,
             top_p = self.RC.TOP_P,
             stream = False,
+            tools=data_tools
         )
-
+        # 计算token
         data = response.choices
         token = response.usage
-        for k, v in token.items():  # 计算token
+        for k, v in token.items():
             if k not in self.using_token:
                 logger.warning(f"无法保存的键值：{k}：{v}", self.ID)
                 continue
@@ -126,9 +111,20 @@ class AIClient:
         return self.RC.module_dict[name]
 
     def get_module_tool(self, name):
-        if name not in self.RC.module_dict:
+        if name not in self.RC.module_dict or not name == "system":
             return {"res": "ERROR"}
-        return self.RC.module_dict[name].tools
+        if name == "system":
+            data: list[dict,] = self.RC.tools
+        else:
+            data: list[dict,] = self.RC.module_dict[name].tools
+        tools = []
+        for item in data:
+            tool = {
+                "name": "function",
+                "function": item
+            }
+            tools.append(tool)
+        return tools
 
     def stop(self):
         """停止"""

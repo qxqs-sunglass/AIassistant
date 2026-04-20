@@ -24,18 +24,15 @@ class WorkCore(threading.Thread):
 
         self.module_dict = self.RC.module_dict  # 存放实例处
         self.module_intro = self.RC.module_intro  # api简介
-        #
-        self.dispose_dict = {
-            "call": self.call_ai,
-            "get_model_tools": self.get_module_tools,
-        }  # 函数
 
         self.msg_now = "" # 当前消息
         self.mode = "CMD_MODE"  # 模式
+        self.tools_name = "system"  # 工具名称
         # 聊天模式：CHAT_MODE
         # 指令模式：CMD_MODE
         # 注：更换模式由AI助手控制
         self.active = True  # 工作核心是否激活
+        self.active_msg = True  # 对话执行流程
 
     def init(self):
         """
@@ -72,17 +69,18 @@ class WorkCore(threading.Thread):
         命令模式处理消息单元
         函数即代表一次处理
         :param msg:  用户消息
+        备注：所有的工具调用都只能在这里进行
         """
         scheme = self.RC.scheme
         ai_module = self.module_dict.get(scheme)
         if not ai_module:  # 目标错误
             logger.error("无目标ai", self.ID)
             return
-
-        if self.mode == "CMD_MODE":
-            self._handle_cmd_mode(msg, scheme)
-        elif self.mode == "CMD_CHAT_MODE":
-            self._handle_chat_mode(msg, scheme)
+        while self.active_msg:
+            if self.mode == "CMD_MODE":
+                self._handle_cmd_mode(msg, scheme, self.tools_name)
+            elif self.mode == "CMD_CHAT_MODE":
+                self._handle_chat_mode(msg, scheme, self.tools_name)
 
     def analysis_json(self, msg: str) -> dict:
         """
@@ -145,17 +143,6 @@ class WorkCore(threading.Thread):
         logger.log(f"❌ JSON解析失败: {msg}", "WorkCore", "WARNING")
         return {"res": False}
 
-    def call_ai(self, name):
-        """
-        调用ai_client的send
-        :param name: 目标模型名称
-        :return:
-        """
-        res = self.CL.send(name)
-        if "error" in res:
-            logger.error(res["error"], self.ID)
-        return
-
     def get_module_tools(self, name):
         """
         获取目标mod的tools
@@ -174,6 +161,7 @@ class WorkCore(threading.Thread):
         :param tools_name: 目标工具包名
         :return:
         """
+        choices = self.CL.send(scheme, user_msg, tools_name)  # 这里只会获取ai调用工具的请求
 
     def _handle_chat_mode(self, user_msg, scheme, tools_name):
         """
@@ -181,4 +169,11 @@ class WorkCore(threading.Thread):
         :param user_msg:
         :return:
         """
+
+    def exit_dispose(self):
+        """
+        终止这一轮对话
+        :return:
+        """
+        self.active_msg = False
 

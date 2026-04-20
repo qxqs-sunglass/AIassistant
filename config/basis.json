@@ -14,5 +14,5 @@
   "confidence_threshold": 70,
   "tool_choice": "required",
   "scheme": "DeepSeek",
-  "load_list": ["/config/using_token"]
+  "load_list": ["config/using_token.json", "config/prompts.json"]
 }

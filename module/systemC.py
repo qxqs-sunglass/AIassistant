@@ -29,7 +29,7 @@ class SYS_C:
                     "properties": {
                         "name": {
                             "type": "string",
-                            "description": "应用名称，如：'战争雷霆'。",
+                            "description": "应用名称，如：'微信'、'酷我音乐'。",
                         }
                     },
                     "required": ["name"]

@@ -39,6 +39,7 @@ class RControl:
         self.tool_choice = "none"  # 使用openai调用模型时是否强制使用tools
         self.scheme = ""
         self.using_token = {}  # 各类token用量统计
+        self.prompts = {}  # 提示词集合
 
         # 系统api设置
         self.module_dict = {}  # api实例
@@ -94,13 +95,26 @@ class RControl:
         except Exception as e:
             logger.log(f"用户未正确配置ai_model.json，{e}", self.ID, "ERROR")
         logger.log("加载基础配置完成", self.ID, "INFO")
-        # 导入api
-        intros = {}
+        messages = ""
         for name, ins in API_instance.items():
             n = ins()
             n.init()
             intro = n.intro
+            messages = messages + intro + "\n"
             self.module_dict[name] = n  # 动态导入
+        self.tools = {
+            "name": "get_module_tool",
+            "description": messages + "以上是你可以选择的工具包",
+            "parameters":{
+                "type": "object",
+                "properties": {
+                    "tools_name": {
+                        "type": "string",
+                        "description": "目标工具包名称，以获取对应工具组件。如：MEDIA_C，调取MEDIA_C的工具包。"
+                    }
+                }
+                }
+            }
 
         if len(self.load_list) > 0:  # 导入额外数据，注：必须确保文件名和变量值一样
            for attr in self.load_list:
