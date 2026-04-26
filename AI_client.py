@@ -1,5 +1,3 @@
-from openai import OpenAI
-import requests
 import Logger
 import openai
 import copy
@@ -26,12 +24,7 @@ class AIClient:
         self.doing_active = False
 
         self.output = ""
-        self.openai = None
-        if self.RC.openai_active:
-            self.openai = OpenAI(
-                api_key=self.RC.openai_api,
-                base_url=self.RC.basis_url
-            )
+        self.get_module_tools = self.RC.get_module_tools
 
     def run(self):
         """运行"""
@@ -40,25 +33,25 @@ class AIClient:
         """更新展示的内容"""
         print("-"*20)
         print(f"当前会话名称：{self.now_history_name}")
-        print(f"当前使用模型：{self.RC.DEFAULT_MODEL}")
+        print(f"当前使用模型：{self.RC.model_data[self.RC.scheme].name}")
         print(f"当前历史记录长度: {self.len_history}")
         if self.doing_active:
             print("AI正在工作...")
         print("聊天内容：" + self.output)
 
-    def send(self, model_name: str, message: str, tools_name: str):
+    def send(self, model_name: str, message: dict, tools_name: str, prompt: str="system"):
         """发送到openai的api上"""
         model = self.RC.model_data.get(model_name, None)
         if model is None:
             return {"error": "无目标模型"}
-        data_msgs = self.package_openai(message)
-        data_tools = self.get_module_tool(tools_name)
+        data_msgs = self.package_openai(message, prompt)
+        data_tools = self.get_module_tools(tools_name)
 
         client: openai.Client = model.get("client")
         if client is None:
             return {"error": "当前model无发送客户端"}
         response = client.chat.completions.create(
-            model=model["model"],
+            model=model.model,
             messages=data_msgs,
             max_tokens=512,
             temperature=self.RC.TEMPERATURE,
@@ -69,29 +62,27 @@ class AIClient:
         # 计算token
         data = response.choices
         token = response.usage
-        for k, v in token.items():
-            if k not in self.using_token:
-                logger.warning(f"无法保存的键值：{k}：{v}", self.ID)
+        for k in self.using_token.keys():
+            if k not in token.__dict__:
+                logger.warning(f"无目标值：{k}", self.ID)
                 continue
-            self.using_token[k] += v
+            self.using_token[k] += token.__getattribute__(k)
         self.RC.save("config/using_token.json", "using_token")
-        self.now_history.append(data[-1])
+        logger.info(f"{data[-1]}", self.ID)
 
         return data
 
-    def package_openai(self, messages: str):
+    def package_openai(self, messages: dict, prompt: str="system"):
         """
         打包openai的消息键值
+        :param prompt:
         :param messages:
         :return:
         """
-        self.now_history.append(
-            {
-                "content": messages,
-                "role": "user"
-            }
-        )
-        payload = copy.copy(self.now_history)
+        payload = [{"role": prompt, "content": self.RC.prompts.get(prompt)}]
+        logger.info(f"{messages["role"]}-> {messages["content"]}", self.ID)  # 保存日志
+        self.now_history.append(messages) # 加入历史对话
+        payload = payload + copy.copy(self.now_history)  # 复制一个历史对话
         return payload
 
     def empty_history(self):
@@ -109,22 +100,6 @@ class AIClient:
         if name not in self.RC.module_dict.keys():
             return {"res": "ERROR"}
         return self.RC.module_dict[name]
-
-    def get_module_tool(self, name):
-        if name not in self.RC.module_dict or not name == "system":
-            return {"res": "ERROR"}
-        if name == "system":
-            data: list[dict,] = self.RC.tools
-        else:
-            data: list[dict,] = self.RC.module_dict[name].tools
-        tools = []
-        for item in data:
-            tool = {
-                "name": "function",
-                "function": item
-            }
-            tools.append(tool)
-        return tools
 
     def stop(self):
         """停止"""

@@ -1,14 +1,15 @@
-import Logger
+from .Template import Template
 import pathlib
 import json
 import os
 
 
-class SYS_C:
+class SYS_C(Template):
     def __init__(self):
         """
         系统控制类
         """
+        super().__init__()
         self.intro = "SYS_C：负责系统控制，相关操作：关机、重启、锁定、打开应用程序"
         self.Work_dict = {
             "open_app": self.open_app,
@@ -81,15 +82,17 @@ class SYS_C:
         else:
             self.app_dict = tempdata
 
-    def open_app(self, name):
+    def open_app(self, **kwargs):
         """
         控制应用打开
         :return:
         """
+        if kwargs.get("name", None):
+            return {"error": "应用名称出错"}
         try:
-            os.startfile(self.app_dict[name])
-        except Exception:
-            return None
+            os.startfile(self.app_dict[kwargs.get("name")])
+        except Exception as e:
+            return {"error": f"问题出现在：{e}"}
 
     def shutdown_s(self):
         """

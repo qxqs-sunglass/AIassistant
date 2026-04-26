@@ -1,9 +1,10 @@
 from ctypes import wintypes, windll, Structure, POINTER, Union, byref, sizeof
+from .Template import Template
 import keyboard
 import time
 
 
-class WinMedia:
+class WinMedia(Template):
     # 虚拟键码常量
     VK_MEDIA_PLAY_PAUSE = 0xB3
     VK_MEDIA_NEXT_TRACK = 0xB0
@@ -13,6 +14,7 @@ class WinMedia:
     VK_VOLUME_UP = 0xAF
 
     def __init__(self):
+        super().__init__()
         self.intro = "MEDIA_C：负责计算机的媒体控制，具体为控制音乐或其他媒体的：播放/暂停、下一首、上一首"
         self.Work_dict = {
             "play_pause()": self.play_pause,
@@ -115,11 +117,11 @@ class WinMedia:
 
                 # 发送输入
                 windll.user32.SendInput(2, byref(inputs), sizeof(INPUT))
-                return True
+                return {"role": "tool"}
             except Exception as e2:
                 print(f"SendInput失败: {e2}")
 
-        return False
+        return {"role": "tool", "content": "工具调用失败"}
 
     @classmethod
     def play_pause(cls):
@@ -159,7 +161,7 @@ class WinMedia:
 
 
 class KeyMedia:
-    """使用keyboard库的媒体控制器"""
+    """使用keyboard库的媒体控制器（已废弃）"""
     WorkWord = """
         适用于媒体控制的函数：
         - play_pause()  播放/暂停

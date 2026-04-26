@@ -89,6 +89,8 @@ class RControl:
             with open(os.path.join(self.DEFAULT_PATH, self.PATH_DICT["AI_MODEL"]), "r", encoding="utf-8") as f:
                 data = json.load(f)
             for aim in data:
+                if aim["name"] in self.key_data.keys():  # 编入key的值
+                    aim["key"] = self.key_data[aim["name"]]
                 model = AIModel()
                 model.init(aim)
                 self.model_data[model.name] = model
@@ -112,7 +114,8 @@ class RControl:
                         "type": "string",
                         "description": "目标工具包名称，以获取对应工具组件。如：MEDIA_C，调取MEDIA_C的工具包。"
                     }
-                }
+                },
+                "required": ["tools_name"]
                 }
             }
 
@@ -150,7 +153,7 @@ class RControl:
         p = path.split(".")
         p = p[-1]
         if p == "json":
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             temp = self.__getattribute__(target)  # 为了防止数据丢失，故，先定向后更新
             temp.update(data)
@@ -170,3 +173,29 @@ class RControl:
             return True
         except Exception as e:
             return {"error": f"错误：{e}"}
+
+    def get_module_tools(self, name):
+        if name not in self.module_dict and name != "system":
+            return {"res": "ERROR"}
+        if name == "system":
+            data: list[dict,] = [self.tools]
+        else:
+            data: list[dict,] = self.module_dict[name].tools
+            data.append(self.tools)
+        tools = []
+        for item in data:
+            tool = {
+                "type": "function",
+                "function": item
+            }
+            tools.append(tool)
+        tools.append(
+            {
+                "type": "function",
+                "function":{
+                    "name": "exit_dispose",
+                    "description": "用于终止本次工作，如果遇到通过调用工具无法达成用户需求时请调用这个函数。"
+                }
+            }
+        )
+        return tools

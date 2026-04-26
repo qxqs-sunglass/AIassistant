@@ -22,8 +22,8 @@ class WorkCore(threading.Thread):
         self.TTS = self.master.tts_engine  # 语音合成器
         self.CL = self.master.ai_client  # ai集成客户端
 
-        self.module_dict = self.RC.module_dict  # 存放实例处
-        self.module_intro = self.RC.module_intro  # api简介
+        self.module_dict = self.RC.module_dict  # 存放api实例处
+        self.model_data = self.RC.model_data  # ai模型数据
 
         self.msg_now = "" # 当前消息
         self.mode = "CMD_MODE"  # 模式
@@ -33,6 +33,8 @@ class WorkCore(threading.Thread):
         # 注：更换模式由AI助手控制
         self.active = True  # 工作核心是否激活
         self.active_msg = True  # 对话执行流程
+
+        self.get_module_tools = self.RC.get_module_tools  # 获取工具包
 
     def init(self):
         """
@@ -49,9 +51,10 @@ class WorkCore(threading.Thread):
         while self.active:
             data: list = self.SPH.get_msg()
             if len(data) > 0:  # 收到消息
-                msg = data[0]
-                self.dispose(msg)
-                data.pop(0)  # 抛出第一项
+                for i in range(len(data)):
+                    msg = data[i]
+                    self.active_msg = True
+                    self.dispose(msg)
             self.SPH.reply_send()  # 回复处理完成
             time.sleep(self.RC.LOOP_INTERVAL)
 
@@ -72,15 +75,14 @@ class WorkCore(threading.Thread):
         备注：所有的工具调用都只能在这里进行
         """
         scheme = self.RC.scheme
-        ai_module = self.module_dict.get(scheme)
+        ai_module = self.model_data.get(scheme)
         if not ai_module:  # 目标错误
             logger.error("无目标ai", self.ID)
             return
-        while self.active_msg:
-            if self.mode == "CMD_MODE":
-                self._handle_cmd_mode(msg, scheme, self.tools_name)
-            elif self.mode == "CMD_CHAT_MODE":
-                self._handle_chat_mode(msg, scheme, self.tools_name)
+        if self.mode == "CMD_MODE":
+            self._handle_cmd_mode(msg, scheme, self.tools_name)
+        elif self.mode == "CMD_CHAT_MODE":
+            self._handle_chat_mode(msg, scheme, self.tools_name)
 
     def analysis_json(self, msg: str) -> dict:
         """
@@ -143,16 +145,6 @@ class WorkCore(threading.Thread):
         logger.log(f"❌ JSON解析失败: {msg}", "WorkCore", "WARNING")
         return {"res": False}
 
-    def get_module_tools(self, name):
-        """
-        获取目标mod的tools
-        :param name:目标mod名字
-        :return:
-        """
-        if name not in self.RC.module_dict.keys():
-            return {"error": f"不存在的目标{name}"}
-        return self.RC.module_dict[name]
-
     def _handle_cmd_mode(self, user_msg, scheme, tools_name):
         """
         使用cmd方式发送
@@ -161,7 +153,30 @@ class WorkCore(threading.Thread):
         :param tools_name: 目标工具包名
         :return:
         """
-        choices = self.CL.send(scheme, user_msg, tools_name)  # 这里只会获取ai调用工具的请求
+        role = "user"
+        content = user_msg
+        message = {"role": role, "content": content}
+        while self.active_msg:
+            choices = self.CL.send(scheme, message, tools_name)  # 这里只会获取ai调用工具的请求
+            data = choices[0]  # 只获取最新的消息
+            for tool in data.tool_calls:
+                # 获取所需参数
+                arguments = tool.arguments  # 获取参数
+                tname = tool.name  # 获取工具名
+                tools = self.get_module_tools(tools_name)  # 获取工具包。
+                tool_id = tool.id
+                # 开始执行
+                if tname not in tools.keys():
+                    logger.warning(f"目标工具包内无对应组件：{tname}，请检查文件配置信息", self.ID)
+                    continue
+                temp: dict = tools[tname](kwargs=arguments)
+                message = {
+                    "role": temp.get("role", "tool"),
+                    "tool_call_id": tool_id,
+                    "content": temp.get("content", "工具无返回信息，或已执行。")
+                }  # 建立新信息
+                logger.info(f"调用工具：{tname}", self.ID)
+                logger.info(f"role=> {message['role']}; content=> {message['content']}", self.ID)
 
     def _handle_chat_mode(self, user_msg, scheme, tools_name):
         """

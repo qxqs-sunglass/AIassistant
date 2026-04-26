@@ -26,6 +26,8 @@ class AIModel:
         :return:
         """
         for key, value in setting.items():
+            if key in self.blacklist:
+                continue
             self.__setattr__(key, value)
 
         if self.basis_url == "" or self.key == "":
@@ -65,11 +67,6 @@ class AIModel:
             self.active = False
             return {"error": e}
         return {"INFO": f"模型源：{self.name}校验完成"}
-
-    def __setattr__(self, key, value):
-        if key in self.blacklist:
-            return
-        self.__dict__[key] = value
 
     def get(self, key: str) -> object:
         """
