@@ -175,6 +175,11 @@ class RControl:
             return {"error": f"错误：{e}"}
 
     def get_module_tools(self, name):
+        """
+        注：这里获取的是工具包的tools简介，不是工具指令
+        :param name:
+        :return:
+        """
         if name not in self.module_dict and name != "system":
             return {"res": "ERROR"}
         if name == "system":
@@ -199,3 +204,29 @@ class RControl:
             }
         )
         return tools
+
+    def use_tool(self, tools_name, tname, arguments):
+        """
+        使用tool
+        :param tools_name:
+        :param tname:
+        :param arguments:
+        :return:
+        """
+        tools = self.module_dict[tools_name].Work_dict
+        if tname == "exit_dispose":
+            self.master.work_core.exit_dispose()
+            return {
+                "role": "tool",
+                "content": "已退出对话状态",
+                "logs": {
+                    "msg"
+                }
+            }
+        if tname not in tools.keys():
+            return {
+                "role": "tool",
+                "content": f"目标工具名不存在：{tname}",
+                "log": {"msg": f"目标工具名不存在：{tname}", "level": "ERROR"}
+            }
+        return tools[tname](kwargs=arguments)

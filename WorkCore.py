@@ -35,6 +35,7 @@ class WorkCore(threading.Thread):
         self.active_msg = True  # 对话执行流程
 
         self.get_module_tools = self.RC.get_module_tools  # 获取工具包
+        self.use_tool = self.RC.use_tool  # 调用工具包
 
     def init(self):
         """
@@ -159,21 +160,35 @@ class WorkCore(threading.Thread):
         while self.active_msg:
             choices = self.CL.send(scheme, message, tools_name)  # 这里只会获取ai调用工具的请求
             data = choices[0]  # 只获取最新的消息
-            for tool in data.tool_calls:
+            for tool in data.message.tool_calls:
                 # 获取所需参数
                 arguments = tool.arguments  # 获取参数
-                tname = tool.name  # 获取工具名
-                tools = self.get_module_tools(tools_name)  # 获取工具包。
+                tname = tool.name  # 获取工具名。
                 tool_id = tool.id
                 # 开始执行
-                if tname not in tools.keys():
-                    logger.warning(f"目标工具包内无对应组件：{tname}，请检查文件配置信息", self.ID)
+                temp:dict = self.use_tool(tools_name, tname, arguments)  # 获取工具包
+                # 记录日志
+                if "logs" in temp.keys():
+                    logs: dict|list = temp.get("logs")
+                    if type(logs) is list:
+                        for l in logs:
+                            logger.log(
+                                l.get("msg", "目标未记录日志"),
+                                l.get("level", "INFO"),
+                                self.ID
+                            )
+                    elif type(logs) is dict:
+                        logger.log(
+                            logs.get("msg", "目标未记录日志"),
+                            logs.get("level", "INFO"),
+                            self.ID
+                        )
                     continue
-                temp: dict = tools[tname](kwargs=arguments)
+                # 建立新消息
                 message = {
                     "role": temp.get("role", "tool"),
                     "tool_call_id": tool_id,
-                    "content": temp.get("content", "工具无返回信息，或已执行。")
+                    "content": temp.get("content", "工具无返回信息，可能已完成执行动作。")
                 }  # 建立新信息
                 logger.info(f"调用工具：{tname}", self.ID)
                 logger.info(f"role=> {message['role']}; content=> {message['content']}", self.ID)

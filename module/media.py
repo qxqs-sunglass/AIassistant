@@ -74,10 +74,12 @@ class WinMedia(Template):
             windll.user32.keybd_event(key_code, 0, 0, 0)  # 按下
             time.sleep(0.05)  # 短暂延迟
             windll.user32.keybd_event(key_code, 0, 2, 0)  # 释放
-            return True
+            return {
+                "role": "tool",
+                "content": f"成功执行指令：{key_code}",
+                "logs": {"msg": f"成功执行指令：{key_code}", "level": "INFO"}
+            }
         except Exception as e:
-            print(f"keybd_event失败: {e}")
-
             # 方法2: 使用SendInput（更可靠）
             try:
                 # 定义INPUT结构
@@ -117,11 +119,19 @@ class WinMedia(Template):
 
                 # 发送输入
                 windll.user32.SendInput(2, byref(inputs), sizeof(INPUT))
-                return {"role": "tool"}
+                return {
+                    "role": "tool",
+                    "content": f"成功调用，调用方式：SendInput。",
+                    "logs": {"msg": f"windll工具调用失败，错误代码：{e}", "level": "ERROR"}
+                }
             except Exception as e2:
                 print(f"SendInput失败: {e2}")
 
-        return {"role": "tool", "content": "工具调用失败"}
+        return {
+            "role": "tool",
+            "content": "工具调用失败",
+            "logs": {"msg": "调用失败", "level": "ERROR"}
+        }
 
     @classmethod
     def play_pause(cls):

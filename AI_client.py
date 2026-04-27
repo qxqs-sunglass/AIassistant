@@ -60,7 +60,7 @@ class AIClient:
             tools=data_tools
         )
         # 计算token
-        data = response.choices
+        choices = response.choices
         token = response.usage
         for k in self.using_token.keys():
             if k not in token.__dict__:
@@ -68,9 +68,9 @@ class AIClient:
                 continue
             self.using_token[k] += token.__getattribute__(k)
         self.RC.save("config/using_token.json", "using_token")
-        logger.info(f"{data[-1]}", self.ID)
+        logger.info(f"{choices[0].message.content}", self.ID)
 
-        return data
+        return choices
 
     def package_openai(self, messages: dict, prompt: str="system"):
         """

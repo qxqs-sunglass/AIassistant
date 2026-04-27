@@ -88,11 +88,24 @@ class SYS_C(Template):
         :return:
         """
         if kwargs.get("name", None):
-            return {"error": "应用名称出错"}
+            return {
+                "role": "tool",
+                "content": "tool未响应，目标参数不存在：name",
+                "logs": {"msg": "应用名称出错", "level": "ERROR"}
+            }
         try:
             os.startfile(self.app_dict[kwargs.get("name")])
+            return {
+                "role": "tool",
+                "content": f"成功启动应用：{kwargs['name']}",
+                "logs": {"msg": "应用名称出错", "level": "INFO"}
+            }
         except Exception as e:
-            return {"error": f"问题出现在：{e}"}
+            return {
+                "role": "tool",
+                "content": "tool调用失败。",
+                "logs": {"msg": f"问题出现在：{e}", "level": "ERROR"}
+                }
 
     def shutdown_s(self):
         """
@@ -103,6 +116,14 @@ class SYS_C(Template):
 
         # 避免测试出问题
         os.system("shutdown /a")
+        return {
+            "role": "tool",
+            "content": "已成功执行",
+            "logs": {
+                "msg": "已成功执行",
+                "level": "INFO"
+            }
+        }
 
     def shutdown_r(self):
         """
@@ -113,6 +134,14 @@ class SYS_C(Template):
 
         # 避免测试出问题
         os.system("shutdown /a")
+        return {
+            "role": "tool",
+            "content": "已成功执行",
+            "logs": {
+                "msg": "已成功执行",
+                "level": "INFO"
+            }
+        }
 
     def shutdown_i(self):
         """
@@ -123,3 +152,11 @@ class SYS_C(Template):
 
         # 避免测试出问题
         os.system("shutdown /a")
+        return {
+            "role": "tool",
+            "content": "已成功执行",
+            "logs": {
+                "msg": "已成功执行",
+                "level": "INFO"
+            }
+        }
