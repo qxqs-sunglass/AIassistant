@@ -17,13 +17,13 @@ class WorkCore(threading.Thread):
         super().__init__()
         self.ID = "WorkCore"
         self.master = master
-        self.RC = self.master.RC  # 资源控制器
-        self.SPH = self.master.speech_recognizer  # 语音识别器
-        self.TTS = self.master.tts_engine  # 语音合成器
-        self.CL = self.master.ai_client  # ai集成客户端
+        self.RC = None  # 资源控制器
+        self.SPH = None  # 语音识别器
+        self.TTS = None  # 语音合成器
+        self.CL = None  # ai集成客户端
 
-        self.module_dict = self.RC.module_dict  # 存放api实例处
-        self.model_data = self.RC.model_data  # ai模型数据
+        self.module_dict = None  # 存放api实例处
+        self.model_data = None  # ai模型数据
 
         self.msg_now = "" # 当前消息
         self.mode = "CMD_MODE"  # 模式
@@ -34,14 +34,24 @@ class WorkCore(threading.Thread):
         self.active = True  # 工作核心是否激活
         self.active_msg = True  # 对话执行流程
 
-        self.get_module_tools = self.RC.get_module_tools  # 获取工具包
-        self.use_tool = self.RC.use_tool  # 调用工具包
+        self.get_module_tools = None  # 获取工具包
+        self.use_tool = None  # 调用工具包
 
     def init(self):
         """
         初始化
         :return:
         """
+        self.RC = self.master.RC  # 资源控制器
+        self.SPH = self.master.speech_recognizer  # 语音识别器
+        self.TTS = self.master.tts_engine  # 语音合成器
+        self.CL = self.master.ai_client  # ai集成客户端
+
+        self.module_dict = self.RC.module_dict  # 存放api实例处
+        self.model_data = self.RC.model_data  # ai模型数据
+
+        self.get_module_tools = self.RC.get_module_tools  # 获取工具包
+        self.use_tool = self.RC.use_tool  # 调用工具包
 
     def run(self):
         """
@@ -75,98 +85,57 @@ class WorkCore(threading.Thread):
         :param msg:  用户消息
         备注：所有的工具调用都只能在这里进行
         """
+        self.active_msg = True
         scheme = self.RC.scheme
         ai_module = self.model_data.get(scheme)
         if not ai_module:  # 目标错误
             logger.error("无目标ai", self.ID)
             return
         if self.mode == "CMD_MODE":
-            self._handle_cmd_mode(msg, scheme, self.tools_name)
+            self._handle_cmd_mode(msg, scheme)
         elif self.mode == "CMD_CHAT_MODE":
-            self._handle_chat_mode(msg, scheme, self.tools_name)
+            self._handle_chat_mode(msg, scheme)
 
-    def analysis_json(self, msg: str) -> dict:
-        """
-        增强的JSON解析方法，处理多种格式
-        """
-        if not msg:
-            return {"res": False}
-
-        # 清理消息
-        msg = msg.strip()
-
-        # 移除代码块标记
-        if msg.startswith("```json"):
-            msg = msg[7:]
-        if msg.endswith("```"):
-            msg = msg[:-3]
-        msg = msg.strip()
-
-        # 尝试直接解析
-        try:
-            result = json.loads(msg)
-            result["res"] = True
-            logger.log(f"✅ JSON解析成功: {result}", "WorkCore", "DEBUG")
-            return result
-        except json.JSONDecodeError:
-            pass
-
-        # 尝试修复常见的JSON格式问题
-        try:
-            # 修复属性名缺少双引号的问题
-            fixed_msg = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', msg)
-            # 修复字符串值中的单引号
-            fixed_msg = re.sub(r":\s*'([^']*)'", r': "\1"', fixed_msg)
-
-            result = json.loads(fixed_msg)
-            result["res"] = True
-            logger.log(f"✅ JSON修复后解析成功: {result}", "WorkCore", "DEBUG")
-            return result
-        except (json.JSONDecodeError, Exception):
-            pass
-
-        # 最后尝试提取大括号内的内容
-        try:
-            start = msg.find("{")
-            end = msg.rfind("}")
-
-            if start != -1 and end != -1 and start < end:
-                json_str = msg[start:end + 1]
-                # 再次尝试修复和解析
-                fixed_json = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', json_str)
-                fixed_json = re.sub(r":\s*'([^']*)'", r': "\1"', fixed_json)
-
-                result = json.loads(fixed_json)
-                result["res"] = True
-                logger.log(f"✅ 提取并修复JSON成功: {result}", "WorkCore", "DEBUG")
-                return result
-        except Exception:
-            pass
-
-        logger.log(f"❌ JSON解析失败: {msg}", "WorkCore", "WARNING")
-        return {"res": False}
-
-    def _handle_cmd_mode(self, user_msg, scheme, tools_name):
+    def _handle_cmd_mode(self, user_msg, scheme):
         """
         使用cmd方式发送
         :param user_msg: 用户消息
         :param scheme: 执行方案（ai名）
-        :param tools_name: 目标工具包名
         :return:
         """
         role = "user"
         content = user_msg
         message = {"role": role, "content": content}
         while self.active_msg:
-            choices = self.CL.send(scheme, message, tools_name)  # 这里只会获取ai调用工具的请求
+            choices: dict|list = self.CL.send(scheme, message)  # 这里只会获取ai调用工具的请求
+            if type(choices) is dict:
+                if "ERROR" in choices.keys():
+                    logger.error(choices["ERROR"], self.ID)
+                    self.exit_dispose()
+                    break
+
             data = choices[0]  # 只获取最新的消息
+            if not data.message.tool_calls:
+                # 播报或输出 data.message.content
+                self.TTS.speak(data.message.content)
+                self.active_msg = False
+                break
             for tool in data.message.tool_calls:
                 # 获取所需参数
-                arguments = tool.arguments  # 获取参数
-                tname = tool.name  # 获取工具名。
+                raw_args = tool.function.arguments
+                if isinstance(raw_args, str):
+                    try:
+                        arguments = json.loads(raw_args) if raw_args.strip() else {}
+                    except json.JSONDecodeError as e:
+                        logger.error(f"解析 JSON 参数失败: {raw_args}, 错误: {e}", self.ID)
+                        arguments = {}
+                else:
+                    arguments = raw_args or {}
+                arguments["m-self"] = self  # 把自己加进去
+                tname = tool.function.name  # 获取工具名。
                 tool_id = tool.id
                 # 开始执行
-                temp:dict = self.use_tool(tools_name, tname, arguments)  # 获取工具包
+                temp:dict = self.use_tool(self.tools_name, tname, arguments)  # 获取工具包
                 # 记录日志
                 if "logs" in temp.keys():
                     logs: dict|list = temp.get("logs")
@@ -183,7 +152,6 @@ class WorkCore(threading.Thread):
                             logs.get("level", "INFO"),
                             self.ID
                         )
-                    continue
                 # 建立新消息
                 message = {
                     "role": temp.get("role", "tool"),
@@ -193,17 +161,27 @@ class WorkCore(threading.Thread):
                 logger.info(f"调用工具：{tname}", self.ID)
                 logger.info(f"role=> {message['role']}; content=> {message['content']}", self.ID)
 
-    def _handle_chat_mode(self, user_msg, scheme, tools_name):
+    def _handle_chat_mode(self, user_msg, scheme):
         """
         聊天模式
         :param user_msg:
+        :param scheme:
         :return:
         """
 
-    def exit_dispose(self):
+    def exit_dispose(self, **kwargs) -> dict:
         """
         终止这一轮对话
         :return:
         """
+        self.CL.empty_history()
+        self.tools_name = "system"
         self.active_msg = False
-
+        return {
+                "role": "tool",
+                "content": "已退出对话状态",
+                "logs": {
+                    "msg": "退出任务模式",
+                    "level": "ERROR"
+                },
+            }

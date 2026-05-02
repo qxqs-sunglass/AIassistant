@@ -107,7 +107,7 @@ class SYS_C(Template):
                 "logs": {"msg": f"问题出现在：{e}", "level": "ERROR"}
                 }
 
-    def shutdown_s(self):
+    def shutdown_s(self, **kwargs):
         """
         关机操作
         :return:
@@ -125,7 +125,7 @@ class SYS_C(Template):
             }
         }
 
-    def shutdown_r(self):
+    def shutdown_r(self, **kwargs):
         """
         重启操作
         :return:
@@ -143,7 +143,7 @@ class SYS_C(Template):
             }
         }
 
-    def shutdown_i(self):
+    def shutdown_i(self, **kwargs):
         """
         注销操作
         :return:

@@ -50,7 +50,8 @@ class RControl:
         # 设置
         self.model_data = {}  # 储存ai模型
         # 特别标注：openai的实例被放在的目标模型下的client标签中
-        self.tools = {}  # 系统工具
+        self.tools = []  # 系统工具包
+        self.system_tools = {}
         self.key_data = {}
         self.key_active = True  # openai需要的API key
         self.ai_active = True  # 确认是否有可运行的ai
@@ -104,8 +105,8 @@ class RControl:
             intro = n.intro
             messages = messages + intro + "\n"
             self.module_dict[name] = n  # 动态导入
-        self.tools = {
-            "name": "get_module_tool",
+        self.tools = [{
+            "name": "choose_tools",
             "description": messages + "以上是你可以选择的工具包",
             "parameters":{
                 "type": "object",
@@ -117,13 +118,23 @@ class RControl:
                 },
                 "required": ["tools_name"]
                 }
+            },
+            {
+            "name": "exit_dispose",
+            "description": "当用户的任务完成后请调用这个函数告诉程序已经完成了，如果遇到通过调用工具无法达成用户需求时也请调用这个函数。"
             }
+        ]
 
         if len(self.load_list) > 0:  # 导入额外数据，注：必须确保文件名和变量值一样
            for attr in self.load_list:
                name = os.path.split(attr)[-1]
                name = name.rsplit(".", 1)[0]
                self.load(attr, name)
+
+        self.system_tools = {
+            "exit_dispose": self.master.work_core.exit_dispose,
+            "choose_tools": self.choose_tools
+        }
 
     def verify(self):
         """资源校验"""
@@ -180,30 +191,55 @@ class RControl:
         :param name:
         :return:
         """
-        if name not in self.module_dict and name != "system":
-            return {"res": "ERROR"}
-        if name == "system":
-            data: list[dict,] = [self.tools]
-        else:
-            data: list[dict,] = self.module_dict[name].tools
-            data.append(self.tools)
+        # 系统模式：只提供 choose_tools 和 exit_dispose
         tools = []
-        for item in data:
-            tool = {
+        if name in self.module_dict.keys():
+            for func_def in self.module_dict[name].tools:
+                tools.append({
+                    "type": "function",
+                    "function": func_def
+                })
+        for func_def in self.tools:  # 加载系统工具
+            tools.append({
                 "type": "function",
-                "function": item
-            }
-            tools.append(tool)
-        tools.append(
-            {
-                "type": "function",
-                "function":{
-                    "name": "exit_dispose",
-                    "description": "用于终止本次工作，如果遇到通过调用工具无法达成用户需求时请调用这个函数。"
+                "function": func_def
+            })
+        return tools
+
+    def choose_tools(self, **kwargs):
+        """
+        选择工具包
+        :return:
+        """
+        tools_name = kwargs.get("tools_name", "system")
+        master = kwargs.get("m-self", None)
+        if master is None:
+            return {
+                "role": "tool",
+                "content": "程序本身错误...请退出工作状态",
+                "logs": {
+                    "msg": "程序本身错误...",
+                    "level": "ERROR"
                 }
             }
-        )
-        return tools
+        if tools_name not in self.module_dict.keys():
+            return {
+                "role": "tool",
+                "content": "无目标工具包",
+                "logs": {
+                    ""
+                }
+            }
+        # 正式执行
+        master.tools_name = tools_name
+        return {
+            "role": "tool",
+            "content": f"已获取到相关工具包：{tools_name}",
+            "logs": {
+                "msg": f"检测到执行更换工具包名：{tools_name}",
+                "level": "INFO"
+            }
+        }
 
     def use_tool(self, tools_name, tname, arguments):
         """
@@ -213,20 +249,22 @@ class RControl:
         :param arguments:
         :return:
         """
-        tools = self.module_dict[tools_name].Work_dict
-        if tname == "exit_dispose":
-            self.master.work_core.exit_dispose()
+        if tname in self.system_tools.keys():
+            return self.system_tools[tname](**arguments)
+        if tools_name not in self.module_dict.keys() and not tools_name == "system":
             return {
                 "role": "tool",
-                "content": "已退出对话状态",
+                "content": f"工具包不存在：{tools_name}",
                 "logs": {
-                    "msg"
+                    "msg": f"工具包不存在：{tools_name}",
+                    "level": "ERROR"
                 }
             }
+        tools = self.module_dict[tools_name].Work_dict
         if tname not in tools.keys():
             return {
                 "role": "tool",
-                "content": f"目标工具名不存在：{tname}",
-                "log": {"msg": f"目标工具名不存在：{tname}", "level": "ERROR"}
+                "content": f"工具名不存在：{tname}",
+                "log": {"msg": f"工具名不存在：{tname}", "level": "ERROR"}
             }
-        return tools[tname](kwargs=arguments)
+        return tools[tname](**arguments)

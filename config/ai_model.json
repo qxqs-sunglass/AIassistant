@@ -1,7 +1,7 @@
 [
   {
     "name": "DeepSeek",
-    "model": "deepseek-chat",
+    "model": "deepseek-v4-flash",
     "basis_url": "https://api.deepseek.com",
     "module_minor": "deepseek-reasoner"
   },

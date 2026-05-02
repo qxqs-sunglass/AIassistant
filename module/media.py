@@ -134,37 +134,37 @@ class WinMedia(Template):
         }
 
     @classmethod
-    def play_pause(cls):
+    def play_pause(cls, **kwargs):
         """播放/暂停"""
         print("🎵 发送播放/暂停命令")
         return cls.send_media_key(cls.VK_MEDIA_PLAY_PAUSE)
 
     @classmethod
-    def next_track(cls):
+    def next_track(cls, **kwargs):
         """下一首"""
         print("🎵 发送下一首命令")
         return cls.send_media_key(cls.VK_MEDIA_NEXT_TRACK)
 
     @classmethod
-    def previous_track(cls):
+    def previous_track(cls, **kwargs):
         """上一首"""
         print("🎵 发送上一首命令")
         return cls.send_media_key(cls.VK_MEDIA_PREV_TRACK)
 
     @classmethod
-    def volume_mute(cls):
+    def volume_mute(cls, **kwargs):
         """静音"""
         print("🔇 发送静音命令")
         return cls.send_media_key(cls.VK_VOLUME_MUTE)
 
     @classmethod
-    def volume_down(cls):
+    def volume_down(cls, **kwargs):
         """音量减小"""
         print("🔉 发送音量减小命令")
         return cls.send_media_key(cls.VK_VOLUME_DOWN)
 
     @classmethod
-    def volume_up(cls):
+    def volume_up(cls, **kwargs):
         """音量增加"""
         print("🔊 发送音量增加命令")
         return cls.send_media_key(cls.VK_VOLUME_UP)

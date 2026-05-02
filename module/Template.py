@@ -20,3 +20,27 @@ class Template:
             return False
         self.Work_dict[tool_name](kwargs=kwargs)
         return True
+
+    def common(self, **kwargs) -> dict:
+        """
+        指令标准格式
+        返还格式:
+        {
+            "role": "tool",  角色
+            "content": "NONE",  信息
+            "logs": {  日志
+                "msg": "NONE",
+                "log": "DEBUG",
+            }
+        }
+        :param kwargs:
+        :return:
+        """
+        return {
+            "role": "tool",
+            "content": "NONE",
+            "logs": {
+                "msg": "NONE",
+                "log": "DEBUG",
+            }
+        }

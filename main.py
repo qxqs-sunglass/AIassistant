@@ -25,7 +25,6 @@ class Main:
         """主程序"""
         self.ID = "Main"
         self.RC = RControl(self)  # 创建资源管理器对象
-        self.RC.init_config()  # 初始化配置
         self.receive = Receive(self)  # 创建接收线程对象
 
         # 创建各个模块对象
@@ -60,6 +59,8 @@ class Main:
         初始化所有
         :return:
         """
+        self.RC.init_config()  # 初始化配置
+        self.ai_client.init()
         self.work_core.init()
         self.RC.verify()  # 资源校验
 
@@ -88,8 +89,6 @@ class Main:
                 os.system("cls")
                 self.update()
                 time.sleep(self.RC.LOOP_INTERVAL)
-
-        self.init()
 
     def update(self):
         """"""
@@ -161,4 +160,5 @@ class Receive(threading.Thread):
 
 if __name__ == '__main__':
     assistant = Main()
+    assistant.init()
     assistant.run()
