@@ -70,7 +70,7 @@ class SpeechRecognizer:
         # 创建并启动监听线程
         listen_thread1 = threading.Thread(target=self.listen, name="ListenThread-001")
         listen_thread1.daemon = True  # 设置为守护线程
-        # listen_thread1.start()
+        listen_thread1.start()
         self.sub_threads.append(listen_thread1)
         print("线程001 - 监听启动")
 
@@ -230,14 +230,6 @@ class SpeechRecognizer:
         self.lis_active = False  # 结束监听线程
         self.sub_threads.clear()  # 清空子线程列表
         print("语音输入程序已停止")
-
-    def reply_test(self, ID):
-        """
-        响应自检
-        :return:
-        """
-        logger.log(f"{self.ID}, 自检响应成功", ID, "INFO")
-        return True
 
 
 """if __name__ == '__main__':
