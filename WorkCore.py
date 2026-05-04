@@ -185,3 +185,11 @@ class WorkCore(threading.Thread):
                     "level": "ERROR"
                 },
             }
+
+    def stop(self):
+        """
+        退出程序
+        :return:
+        """
+        self.active = False
+        logger.info(f"{self.ID}，程序已退出", self.ID)

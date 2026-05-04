@@ -1,6 +1,7 @@
 from RControl import RControl
 from AI_client import AIClient
 from speech_recognizer import SpeechRecognizer
+# from realtimestt_recognizer import RTSTTRecognizer
 from tts_engine import TTSEngine
 from WorkCore import WorkCore
 import Logger
@@ -34,8 +35,6 @@ class Main:
         self.work_core = WorkCore(self)  # 工作核心
 
         # 基础数据 回调函数
-        self.send_message = self.speech_recognizer.enter_msg
-        self.chat_message = self.speech_recognizer.enter_msg
         self.reply_send = self.speech_recognizer.reply_send
         self.say_text = self.tts_engine.say_text  # 说话
         self.enter_msg = self.speech_recognizer.enter_msg  # 输入消息回调函数
@@ -62,11 +61,14 @@ class Main:
         self.RC.init_config()  # 初始化配置
         self.ai_client.init()
         self.work_core.init()
+        self.speech_recognizer.init()
         self.RC.verify()  # 资源校验
 
     def run(self):
+        # 启动各个线程
         self.receive.start()  # 启动接收线程
         self.work_core.start()
+        # self.speech_recognizer.start()
         logger.log("启动程序", self.ID, "INFO")
         logger.log("--核心启动--", self.ID, "INFO")
         self.ai_client.run()
@@ -107,7 +109,6 @@ class Main:
         print("退出程序...")
         self.exit_active = False
         self.receive.stop()
-        self.ai_client.stop()
         self.speech_recognizer.stop()
         self.tts_engine.stop()
 

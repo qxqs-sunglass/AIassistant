@@ -35,6 +35,12 @@ class SpeechRecognizer:
         # 添加子线程列表
         self.sub_threads = []
 
+    def init(self):
+        """
+        初始化
+        :return:
+        """
+
     def update(self):
         """更新展示的内容"""
         print("-"*20)
@@ -160,17 +166,16 @@ class SpeechRecognizer:
                     if text.isspace() or text == "":
                         continue  # 空消息，跳过
 
+                    # 更新消息
+                    self.msg = text
+
                     if self.RC.AI_NAME not in text:
                         continue
 
-                    # 更新消息
-                    self.msg = text
                     self.undisposed_num += 1  # 未处理消息数+1
                     if len(self.msg_list) > 100:
-                        self.msg_list.pop(0)  # 超过200条消息，删除最早的消息
-                        self.msg_list.append(self.msg)
-                    else:
-                        self.msg_list.append(self.msg)
+                        self.msg_list.pop(0)  # 超过100条消息，删除最早的消息
+                    self.msg_list.append(self.msg)
                 except sr.UnknownValueError:
                     print(f"[{threading.current_thread().name}] ❓ 无法识别音频内容")
                 except sr.RequestError as e:
@@ -193,9 +198,12 @@ class SpeechRecognizer:
         """
         if self.undisposed_num <= 0:
             return []  # 没有未处理消息
+        self.last_send_time = time.time()
         data = self.msg_list[-self.undisposed_num:]
         self.undisposed_num = 0  # 重置未处理消息数
         self.doing_active = True
+        if len(self.msg_list) > self.undisposed_num:
+            self.msg_list = self.msg_list[-self.undisposed_num:]
         logger.log(f"消息已获取：{data}", self.ID, "INFO")
         return data
 
